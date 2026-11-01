@@ -627,7 +627,8 @@ thread_local! {
 
 pub fn start(queue: Vec<TestDef>, shared: Option<std::path::PathBuf>) {
     weft_sdk::info!(
-        "testkit: running {} test(s): {}",
+        "testkit: {} {} test(s): {}",
+        if shared.is_some() { "sharing with other processes" } else { "running" },
         queue.len(),
         queue
             .iter()

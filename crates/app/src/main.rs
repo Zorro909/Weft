@@ -175,17 +175,20 @@ fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i3
     let mut dirs: Vec<PathBuf> = (0..jobs)
         .map(|i| run_dir.join("test-jobs").join(i.to_string()))
         .collect();
-    // Where the processes claim each test before running it, so every test runs once.
+    // Where the processes claim each test before running it. A claim left from the last run
+    // would skip its test in every process, so the queue starts empty or the run doesn't start.
     let queue = run_dir.join("test-jobs").join("queue");
-    let _ = std::fs::remove_dir_all(&queue);
-    let _ = std::fs::create_dir_all(&queue);
-    let spawn = |job: &str, value: &std::ffi::OsStr, dir: &PathBuf| {
+    if let Err(e) = empty_folder(&queue) {
+        eprintln!("cannot empty the test queue {}: {e}", queue.display());
+        return Some(2);
+    }
+    let spawn = |flag: &str, value: &std::ffi::OsStr, dir: &PathBuf| {
         let _ = std::fs::create_dir_all(dir);
         // Or a process that dies at once passes by the last run's.
         let _ = std::fs::remove_file(dir.join("test-reports").join("report.txt"));
         let log = std::fs::File::create(dir.join("output.log")).ok()?;
         let mut c = std::process::Command::new(&exe);
-        c.args(["--test", test, &format!("--{job}")])
+        c.args(["--test", test, &format!("--{flag}")])
             .arg(value)
             .arg("--run-dir")
             .arg(dir)
@@ -309,4 +312,50 @@ fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> Result<(), String> 
         }
     }
     Ok(())
+}
+
+/// Makes `dir` an empty folder; an error if anything that was in it is left.
+fn empty_folder(dir: &std::path::Path) -> std::io::Result<()> {
+    let _ = std::fs::remove_dir_all(dir);
+    if let Some(parent) = dir.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::create_dir(dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn scratch(name: &str) -> PathBuf {
+        std::env::temp_dir()
+            .join(format!("weft-{name}-{}", std::process::id()))
+            .join("queue")
+    }
+
+    #[test]
+    fn claims_of_the_last_run_are_removed() {
+        let dir = scratch("emptied");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("f3"), "").unwrap();
+        let result = empty_folder(&dir);
+        let left = std::fs::read_dir(&dir).map_or(0, |d| d.count());
+        let _ = std::fs::remove_dir_all(dir.parent().unwrap());
+        assert!(result.is_ok() && left == 0, "the folder is there and empty");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn claims_that_stay_are_an_error() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch("stuck");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("f3"), "").unwrap();
+        // Its files can't be removed.
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+        let result = empty_folder(&dir);
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let _ = std::fs::remove_dir_all(dir.parent().unwrap());
+        assert!(result.is_err(), "a claim left behind stops the run");
+    }
 }
