@@ -159,7 +159,7 @@ fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i3
             .find(|(k, _)| k == name)
             .map(|(_, v)| v.as_str())
     };
-    if option("test-shard").is_some() || option("test-queue").is_some() {
+    if option("test-queue").is_some() || option("test-alone").is_some() {
         return None;
     }
     let test = option("test")?;
@@ -182,14 +182,14 @@ fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i3
         eprintln!("cannot empty the test queue {}: {e}", queue.display());
         return Some(2);
     }
-    let spawn = |flag: &str, value: &std::ffi::OsStr, dir: &PathBuf| {
+    let spawn = |role: &[&std::ffi::OsStr], dir: &PathBuf| {
         let _ = std::fs::create_dir_all(dir);
         // Or a process that dies at once passes by the last run's.
         let _ = std::fs::remove_file(dir.join("test-reports").join("report.txt"));
         let log = std::fs::File::create(dir.join("output.log")).ok()?;
         let mut c = std::process::Command::new(&exe);
-        c.args(["--test", test, &format!("--{flag}")])
-            .arg(value)
+        c.args(["--test", test])
+            .args(role)
             .arg("--run-dir")
             .arg(dir)
             .stdout(log)
@@ -204,7 +204,7 @@ fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i3
     };
     let children: Vec<_> = dirs
         .iter()
-        .map(|dir| spawn("test-queue", queue.as_os_str(), dir))
+        .map(|dir| spawn(&["--test-queue".as_ref(), queue.as_os_str()], dir))
         .collect();
     let code = |c: Option<std::process::Child>| {
         c.and_then(|mut c| c.wait().ok())
@@ -214,7 +214,7 @@ fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i3
     let mut codes: Vec<i32> = children.into_iter().map(code).collect();
     // What measures how quick the game is can't share the machine: last, on its own.
     dirs.push(run_dir.join("test-jobs").join("alone"));
-    codes.push(code(spawn("test-shard", "alone".as_ref(), &dirs[jobs])));
+    codes.push(code(spawn(&["--test-alone".as_ref()], &dirs[jobs])));
     // A crashed process has no report, and its tests didn't pass.
     let shots = run_dir.join("test-shots");
     let _ = std::fs::remove_dir_all(&shots);

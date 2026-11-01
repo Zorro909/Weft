@@ -126,7 +126,7 @@ fn start(c: &Client) {
     };
     // One of several processes running them all (see the game's `--jobs`): the tests that must
     // run alone, or a share of the others taken from a queue as this process gets free.
-    let alone = launch_option("test-shard").is_some_and(|s| s == "alone");
+    let alone = launch_option("test-alone").is_some();
     let shared = launch_option("test-queue").map(std::path::PathBuf::from);
     let must_be_alone = |t: &runner::TestDef| ALONE.contains(&t.name.as_str());
     let mut queue: Vec<runner::TestDef> = if alone {
