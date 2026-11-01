@@ -4,8 +4,6 @@ use weft_engine::Options;
 use weft_engine::paths::{self, Dirs};
 use weft_render::{Backend, BackendDesc, Error};
 
-mod test_queue;
-
 #[global_allocator]
 static ALLOC: weft_engine::diag::CountingAlloc = weft_engine::diag::CountingAlloc;
 
@@ -177,7 +175,10 @@ fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i3
     let mut dirs: Vec<PathBuf> = (0..jobs)
         .map(|i| run_dir.join("test-jobs").join(i.to_string()))
         .collect();
-    let queue = test_queue::prepare(run_dir);
+    // Where the processes claim each test before running it, so every test runs once.
+    let queue = run_dir.join("test-jobs").join("queue");
+    let _ = std::fs::remove_dir_all(&queue);
+    let _ = std::fs::create_dir_all(&queue);
     let spawn = |job: &str, value: &std::ffi::OsStr, dir: &PathBuf| {
         let _ = std::fs::create_dir_all(dir);
         // Or a process that dies at once passes by the last run's.

@@ -131,11 +131,8 @@ fn start(c: &Client) {
     let must_be_alone = |t: &runner::TestDef| ALONE.contains(&t.name.as_str());
     let mut queue: Vec<runner::TestDef> = if alone {
         queue.into_iter().filter(must_be_alone).collect()
-    } else if let Some(dir) = &shared {
-        queue::in_order(
-            queue.into_iter().filter(|t| !must_be_alone(t)).collect(),
-            dir,
-        )
+    } else if shared.is_some() {
+        queue.into_iter().filter(|t| !must_be_alone(t)).collect()
     } else {
         queue
     };
