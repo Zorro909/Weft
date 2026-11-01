@@ -4,6 +4,8 @@ use weft_engine::Options;
 use weft_engine::paths::{self, Dirs};
 use weft_render::{Backend, BackendDesc, Error};
 
+mod test_queue;
+
 #[global_allocator]
 static ALLOC: weft_engine::diag::CountingAlloc = weft_engine::diag::CountingAlloc;
 
@@ -149,8 +151,9 @@ fn main() {
 }
 
 /// `--test all` runs in several processes at once, each with its own run folder (`--jobs N`, 1 for
-/// one after the other, also what naming tests does unless asked). Each takes every Nth test
-/// (`testkit`, `--test-shard`); what they leave is put together as a single run would have it.
+/// one after the other, also what naming tests does unless asked). Each takes the next test none
+/// of the others has taken (`testkit`, `--test-queue`); what they leave is put together as a single
+/// run would have it.
 fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i32> {
     let option = |name: &str| {
         extra
@@ -158,7 +161,7 @@ fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i3
             .find(|(k, _)| k == name)
             .map(|(_, v)| v.as_str())
     };
-    if option("test-shard").is_some() {
+    if option("test-shard").is_some() || option("test-queue").is_some() {
         return None;
     }
     let test = option("test")?;
@@ -174,13 +177,16 @@ fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i3
     let mut dirs: Vec<PathBuf> = (0..jobs)
         .map(|i| run_dir.join("test-jobs").join(i.to_string()))
         .collect();
-    let spawn = |shard: &str, dir: &PathBuf| {
+    let queue = test_queue::prepare(run_dir);
+    let spawn = |job: &str, value: &std::ffi::OsStr, dir: &PathBuf| {
         let _ = std::fs::create_dir_all(dir);
         // Or a process that dies at once passes by the last run's.
         let _ = std::fs::remove_file(dir.join("test-reports").join("report.txt"));
         let log = std::fs::File::create(dir.join("output.log")).ok()?;
         let mut c = std::process::Command::new(&exe);
-        c.args(["--test", test, "--test-shard", shard, "--run-dir"])
+        c.args(["--test", test, &format!("--{job}")])
+            .arg(value)
+            .arg("--run-dir")
             .arg(dir)
             .stdout(log)
             .stderr(std::process::Stdio::null());
@@ -194,8 +200,7 @@ fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i3
     };
     let children: Vec<_> = dirs
         .iter()
-        .enumerate()
-        .map(|(i, dir)| spawn(&format!("{i}/{jobs}"), dir))
+        .map(|dir| spawn("test-queue", queue.as_os_str(), dir))
         .collect();
     let code = |c: Option<std::process::Child>| {
         c.and_then(|mut c| c.wait().ok())
@@ -205,7 +210,7 @@ fn test_jobs(extra: &[(String, String)], run_dir: &std::path::Path) -> Option<i3
     let mut codes: Vec<i32> = children.into_iter().map(code).collect();
     // What measures how quick the game is can't share the machine: last, on its own.
     dirs.push(run_dir.join("test-jobs").join("alone"));
-    codes.push(code(spawn("alone", &dirs[jobs])));
+    codes.push(code(spawn("test-shard", "alone".as_ref(), &dirs[jobs])));
     // A crashed process has no report, and its tests didn't pass.
     let shots = run_dir.join("test-shots");
     let _ = std::fs::remove_dir_all(&shots);

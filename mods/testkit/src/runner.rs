@@ -606,6 +606,8 @@ struct Outcome {
 
 pub struct Runner {
     queue: Vec<TestDef>,
+    /// The folder of a queue shared with other processes (`queue.rs`).
+    shared: Option<std::path::PathBuf>,
     current: Option<(T, BoxTest, Instant)>,
     done: Vec<Outcome>,
     started: Instant,
@@ -623,7 +625,7 @@ thread_local! {
     static ACTIVE: RefCell<Option<T>> = const { RefCell::new(None) };
 }
 
-pub fn start(queue: Vec<TestDef>) {
+pub fn start(queue: Vec<TestDef>, shared: Option<std::path::PathBuf>) {
     weft_sdk::info!(
         "testkit: running {} test(s): {}",
         queue.len(),
@@ -634,7 +636,8 @@ pub fn start(queue: Vec<TestDef>) {
             .join(", ")
     );
     RUNNER.with(|r| {
-        *r.borrow_mut() = Some(Runner { queue, current: None, done: Vec::new(), started: Instant::now(), finished: false, warmup: 3 })
+        *r.borrow_mut() =
+            Some(Runner { queue, shared, current: None, done: Vec::new(), started: Instant::now(), finished: false, warmup: 3 })
     });
 }
 
@@ -654,12 +657,11 @@ pub fn frame(c: &Client) {
             return;
         }
         if run.current.is_none() {
-            if run.queue.is_empty() {
+            let Some(def) = next(run) else {
                 run.finished = true;
                 finish(c, run);
                 return;
-            }
-            let def = run.queue.remove(0);
+            };
             weft_sdk::info!("testkit: --- {} ---", def.name);
             crate::same_conditions(c);
             let t = T::new(&def.name);
@@ -705,6 +707,22 @@ pub fn frame(c: &Client) {
             }
         }
     });
+}
+
+/// The next test of the queue; of a shared one, the next that no other process has taken. Every
+/// process warms up for itself.
+fn next(run: &mut Runner) -> Option<TestDef> {
+    while !run.queue.is_empty() {
+        let def = run.queue.remove(0);
+        let mine = match &run.shared {
+            Some(dir) => def.name == "warm_up" || crate::queue::claim(dir, &def.name),
+            None => true,
+        };
+        if mine {
+            return Some(def);
+        }
+    }
+    None
 }
 
 fn finish(c: &Client, run: &mut Runner) {
