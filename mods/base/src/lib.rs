@@ -60,7 +60,7 @@ fn init(r: &mut Registry) {
     // Its terrain is described in `worldgen`.
     r.dimension(&OVERWORLD)
         .player_spawn()
-        .sky_above(16)
+        .sky_above(40)
         .day_length(24000)
         .weathers(&[&weathers::RAIN, &weathers::THUNDER]);
     // Second dimension on purpose: nothing in the engine may assume there is only one world.

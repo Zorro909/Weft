@@ -13,16 +13,16 @@ mod relief;
 pub const SEA: i32 = 63;
 
 /// Snow line in a temperate climate (temp = 0)
-const SNOW_LINE: i32 = 190;
+const SNOW_LINE: i32 = 280;
 /// Air cools with height, so the warmer the climate the higher the snow line for this many
 /// blocks for every step of temperature
-const LAPSE: f64 = 100.0;
+const LAPSE: f64 = 150.0;
 /// The lowest y the snow line can get in the coldest climates
 const SNOW_FLOOR: i32 = 165;
 /// Band size of snow line
 const BAND: f64 = 0.1;
-/// Afaik no mountain gets higher than this so a climate whose snow line is above it has none
-const SNOW_TOP: i32 = SEA + 190;
+/// No climate is warm enough for a snow line above this
+const SNOW_TOP: i32 = 520;
 
 fn snow_bands() -> Vec<(f64, f64, i32)> {
     let coldest = f64::from(SNOW_FLOOR - SNOW_LINE) / LAPSE;

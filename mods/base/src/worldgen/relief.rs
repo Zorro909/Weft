@@ -1,7 +1,7 @@
 //! The overworld's relief as parts of its terrain: hills that differ by region, mountains in
 //! massifs, and rare mountain ranges with foothills, a crest, valleys and passes.
 //!
-//! Nothing here may reach the overworld's sky at y 256 (`sky_above(16)` in `lib.rs`): each
+//! Nothing here may reach the overworld's sky at y 640 (`sky_above(40)` in `lib.rs`): each
 //! height says how it stays under it.
 
 use weft_sdk::terrain::*;
@@ -23,11 +23,11 @@ pub const RANGE_BIOME: f64 = 0.25;
 /// How much of `MOUNTAINS` a column needs to belong to the mountains biome.
 pub const MOUNTAINS_BIOME: f64 = 0.45;
 /// A range's forest starts at this y; below it the lowland's biomes go on.
-pub const RANGE_FOREST_FROM: i32 = 100;
+pub const RANGE_FOREST_FROM: i32 = 110;
 /// No trees from this y up.
-pub const TREE_LINE: i32 = 155;
+pub const TREE_LINE: i32 = 200;
 /// Bare stone above this y.
-const ROCK_FROM: i32 = 185;
+const ROCK_FROM: i32 = 250;
 
 /// The size in blocks of the noise whose zero lines the spines of ranges follow.
 const SPINE_SIZE: f64 = 12000.0;
@@ -44,24 +44,24 @@ const GATE: (f64, f64) = (0.12, 0.26);
 const FOOTHILLS: f64 = 0.3;
 
 /// What a range would add if all its parts peaked at once, in blocks.
-const RANGE_HEIGHT: f64 = 215.0;
+const RANGE_HEIGHT: f64 = 600.0;
 /// The most a range adds: the lowland under it reaches y 85 (sea 63, continents 18, dunes 4)
 /// and has no hills where a range can get this high.
-const RANGE_CAP: f64 = 165.0;
+const RANGE_CAP: f64 = 545.0;
 /// The share of a range's height its foothills reach.
 const FOOTHILL_SHARE: f64 = 0.1;
 /// About this many blocks lie between the peaks along a crest, and the saddles between them
 /// are lower by up to twice this share.
-const PEAK_SIZE: f64 = 300.0;
+const PEAK_SIZE: f64 = 420.0;
 const SADDLE_DROP: f64 = 0.28;
 /// The sizes in blocks of the noises a range's largest ridges and the valleys through it follow.
-const RIDGE_SIZE: f64 = 380.0;
-const VALLEY_SIZE: f64 = 650.0;
+const RIDGE_SIZE: f64 = 800.0;
+const VALLEY_SIZE: f64 = 1300.0;
 /// The share of the height a valley floor keeps.
 const VALLEY_FLOOR: f64 = 0.5;
 /// Ridges and valleys are bent by up to this many blocks, in bends about `BEND_SIZE` long.
-const BEND: f64 = 35.0;
-const BEND_SIZE: f64 = 150.0;
+const BEND: f64 = 70.0;
+const BEND_SIZE: f64 = 300.0;
 
 /// What a massif adds along its ridges, in blocks. Where every octave of ridges peaks at once
 /// it is 1.17 times this, which with the lowland (y 85), the highest hills and the roughness
