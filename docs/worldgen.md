@@ -8,6 +8,7 @@ Examples to copy from:
 - `mods/testmod/src/lib.rs`: Mars, a planet made only from terrain presets, `void`, an island written by hand, and a biome, a rock needle and boulders added to Mars as from outside
 - `mods/testmod/src/looks.rs`: an obelisk structure standing in the dry parts of Mars, and outposts grown from pieces joined by their joints, one of them a file in `assets/structures/`
 - `mods/base/src/worldgen.rs`: the overworld, with biomes, caves, trees and flowers
+- `mods/base/src/worldgen/relief.rs`: its hills, mountains and mountain ranges, landforms written as formulas
 
 ## Quick links
 [how generation works](#how-generation-works) | [features](#features) | [ores](#ores) | [structures](#structures) | [plans](#plans) | [placing and finding](#placing-and-finding) | [spawns](#spawns) | [biomes](#biomes) | [dimensions](#dimensions) | [terrain](#terrain) | [trees](#trees-and-other-scattered-things) | [decorations](#decorations) | [changing another mod's terrain](#changing-another-mods-terrain) | [writing a generator](#writing-a-generator)
@@ -255,13 +256,15 @@ preset::hills(16.0, 110.0).mask(Expr::temperature().ramp(-0.35, -0.6).not())
 ```
 
 ### Fields
-A field is a named value over the whole terrain. `temperature`, `humidity` and `continent` come with every terrain (all about -1.4 to 1.4, continentalness below 0 is sea); `.field(name, expr)` declares your own. Masks and other fields use one with `Expr::field(name)`, and biome rules ask for it. It's worked out once per column however many things use it, so one mask shared by a landform and a biome goes here. Base's mountains:
+A field is a named value over the whole terrain. `temperature`, `humidity` and `continent` come with every terrain (all about -1.4 to 1.4, continentalness below 0 is sea); `.field(name, expr)` declares your own. Masks and other fields use one with `Expr::field(name)`, and biome rules ask for it. It's worked out once per column however many things use it, so one mask shared by a landform and a biome goes here. Base's mountains, shortened:
 
 ```rust
-.field("base:mountains", Expr::fbm(0x44, 700.0, 3).ramp(-0.1, 0.3).and(Expr::continent().ramp(0.0, 0.2)))
-.landform(preset::mountains(150.0, 260.0).mask(Expr::field("base:mountains")).named("mountains"))
+.field("base:mountains", Expr::fbm(0x44, 800.0, 3).ramp(0.0, 0.35).and(Expr::continent().ramp(0.05, 0.25)))
+.landform(Landform::new(massifs).mask(Expr::field("base:mountains")).named("mountains"))
 .rule(BiomeRule::new("mountains").field("base:mountains", 0.45..))
 ```
+The overworld's other fields are `base:range` (0 outside a mountain range to 1 on its spine; the biomes `range_forest` and `range_alpine` start at 0.25) and `base:relief` (0 in plains to 1 in uplands and at the foot of a range).
+
 The name is used as written, so give yours your mod's prefix. A field can only use fields declared before it. Declaring one that exists, `temperature` included, replaces it for everything that uses it, which is how a mod gives the whole overworld another climate.
 
 ### Biome rules
