@@ -11,8 +11,8 @@ const SEED: u64 = 5;
 const STEP: i32 = 192;
 const REACH: i32 = 200;
 const SEA: i32 = 63;
-/// The first y of the overworld's sky (`sky_above(16)`).
-const SKY: i32 = 256;
+/// The first y of the overworld's sky (`sky_above(40)`).
+const SKY: i32 = 640;
 
 /// Mountain ranges are rare, rise far above the land around them, and nothing reaches the sky.
 pub async fn mountain_ranges(t: T) -> R {
