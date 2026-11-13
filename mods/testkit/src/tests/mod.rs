@@ -7,6 +7,7 @@ mod gameplay;
 mod looks;
 mod probe;
 pub mod redstone;
+mod relief;
 mod scene;
 mod shields;
 mod sync;
@@ -53,6 +54,7 @@ pub fn all() -> Vec<TestDef> {
         world::edits,
         world::virtual_menus,
         world::worldgen,
+        relief::mountain_ranges,
         world::generation_reads,
         world::plants_on_cube_tops,
         world::foreign_terrain,

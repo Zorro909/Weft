@@ -8,6 +8,8 @@ use crate::blocks::*;
 use weft_sdk::noise::*;
 use weft_sdk::terrain::*;
 
+mod relief;
+
 pub const SEA: i32 = 63;
 
 /// Snow line in a temperate climate (temp = 0)
@@ -155,6 +157,7 @@ pub fn register(r: &mut Registry) {
         .deep_top("gravel", SEA - 8)
         .tag("ocean");
     r.biome(&BEACH).surface("sand", "sand", 3).tag("beach");
+    relief::biomes(r);
     // Underground (3D): whole cubes deep under the surface; spiders like it there.
     r.biome(&DEEP_CAVES).tag("cave").tag("dark");
 
@@ -181,9 +184,12 @@ pub fn register(r: &mut Registry) {
         .base_height(SEA as f64)
         .sea(SEA, "water")
         .landform(preset::continents(18.0))
-        // Biomes shape the land through their climate, not their borders, so nothing seams:
-        // the cold flattens hills into tundra, deserts get dunes.
-        .landform(preset::hills(16.0, 110.0).mask(Expr::temperature().ramp(-0.35, -0.6).not()))
+        // Where the mountain ranges are and how hilly the land is: hills, mountains and ranges
+        // take their height from these, and the ranges' biomes their place.
+        .field(relief::RANGE, relief::range_field())
+        .field(relief::RELIEF, relief::relief_field())
+        .landform(relief::hills())
+        // Deserts get dunes by their climate, not their borders, so nothing seams.
         .landform(
             preset::dunes(4.0, 26.0).mask(
                 Expr::temperature()
@@ -192,17 +198,10 @@ pub fn register(r: &mut Registry) {
             ),
         )
         // How mountainous a place is: the mountains' strength, and where the mountains biome goes.
-        .field(
-            "base:mountains",
-            Expr::fbm(0x44, 700.0, 3)
-                .ramp(-0.1, 0.3)
-                .and(Expr::continent().ramp(0.0, 0.2)),
-        )
-        .landform(
-            preset::mountains(150.0, 260.0)
-                .mask(Expr::field("base:mountains"))
-                .named("mountains"),
-        )
+        .field(relief::MOUNTAINS, relief::mountains_field())
+        .landform(relief::mountains())
+        .landform(relief::ranges())
+        .field(relief::HIGHLAND, relief::highland_field())
         // Slight jittering so snow doesn't fall on visible contours
         .field(
             "base:alpine",
@@ -223,13 +222,23 @@ pub fn register(r: &mut Registry) {
         terrain = terrain.rule(
             BiomeRule::new("snowy_peaks")
                 .named(&format!("snow_line_{i}"))
-                .field("base:mountains", 0.45..)
+                .field(relief::HIGHLAND, relief::MOUNTAINS_BIOME..)
                 .field("base:alpine", cold..warm)
                 .height(line..),
         );
     }
     terrain
-        .rule(BiomeRule::new("mountains").field("base:mountains", 0.45..))
+        .rule(
+            BiomeRule::new("range_alpine")
+                .field(relief::RANGE, relief::RANGE_BIOME..)
+                .height(relief::TREE_LINE..),
+        )
+        .rule(
+            BiomeRule::new("range_forest")
+                .field(relief::RANGE, relief::RANGE_BIOME..)
+                .height(relief::RANGE_FOREST_FROM..),
+        )
+        .rule(BiomeRule::new("mountains").field(relief::MOUNTAINS, relief::MOUNTAINS_BIOME..))
         .rule(BiomeRule::new("snowy_plains"))
         .rule(BiomeRule::new("taiga"))
         .rule(BiomeRule::new("desert"))
