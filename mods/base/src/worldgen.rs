@@ -8,39 +8,10 @@ use crate::blocks::*;
 use weft_sdk::noise::*;
 use weft_sdk::terrain::*;
 
+mod belts;
 mod relief;
 
 pub const SEA: i32 = 63;
-
-/// Snow line in a temperate climate (temp = 0)
-const SNOW_LINE: i32 = 280;
-/// Air cools with height, so the warmer the climate the higher the snow line for this many
-/// blocks for every step of temperature
-const LAPSE: f64 = 150.0;
-/// The lowest y the snow line can get in the coldest climates
-const SNOW_FLOOR: i32 = 165;
-/// Band size of snow line
-const BAND: f64 = 0.1;
-/// No climate is warm enough for a snow line above this
-const SNOW_TOP: i32 = 520;
-/// Blocks across the patches the snow line frays into
-const SNOW_PATCH: f64 = 32.0;
-/// How far the patches move the line, in steps of temperature (`LAPSE` blocks each)
-const SNOW_FRAY: f64 = 0.4;
-
-fn snow_bands() -> Vec<(f64, f64, i32)> {
-    let coldest = f64::from(SNOW_FLOOR - SNOW_LINE) / LAPSE;
-    let edge = |i: usize| coldest + i as f64 * BAND;
-    let mut bands = vec![(f64::NEG_INFINITY, coldest, SNOW_FLOOR)];
-    for i in 0.. {
-        let line = SNOW_LINE + (LAPSE * (edge(i) + BAND / 2.0)).round() as i32;
-        if line > SNOW_TOP {
-            break;
-        }
-        bands.push((edge(i), edge(i + 1), line));
-    }
-    bands
-}
 
 static PLANT_SOIL: Tag = Tag::named("plant_soil");
 static CACTUS_SOIL: Tag = Tag::named("cactus_soil");
@@ -140,7 +111,6 @@ pub fn register(r: &mut Registry) {
         .tag("hot");
     r.biome(&MOUNTAINS)
         .surface("grass", "dirt", 3)
-        .bare_above(130)
         .bare_steeper(relief::CLIFF)
         .tint(grass, 0x8ab689)
         .tint(foliage, 0x6da36b)
@@ -208,16 +178,11 @@ pub fn register(r: &mut Registry) {
         .landform(relief::mountains())
         .landform(relief::ranges())
         .field(relief::HIGHLAND, relief::highland_field())
-        .field(relief::ROCK, relief::rock_field())
-        // Jittered so snow doesn't end on a contour: the line drifts over a mountain's width and
-        // frays into patches a few blocks to a few dozen across.
-        .field(
-            "base:alpine",
-            Expr::temperature() + Expr::noise(400.0) * Expr::value(0.2) + Expr::noise(70.0) * Expr::value(0.1)
-                - Expr::humidity() * Expr::value(0.1)
-                + Expr::noise(SNOW_PATCH) * Expr::value(SNOW_FRAY)
-                + Expr::noise(SNOW_PATCH / 4.0) * Expr::value(SNOW_FRAY / 2.0),
-        )
+        .field(relief::VALLEY, relief::valley_field())
+        // Where the belts up a mountain start.
+        .field(belts::SNOW_LINE, belts::snow_line())
+        .field(belts::ROCK_LINE, belts::rock_line())
+        .field(belts::SCREE, belts::scree())
         // Biomes bring their climate and surface; rules only add where else they must hold.
         .rule(BiomeRule::new("ocean").height(..=SEA - 2))
         .rule(
@@ -228,16 +193,7 @@ pub fn register(r: &mut Registry) {
         )
         .rule(BiomeRule::new("beach").height(..=SEA + 1).continent(..0.1));
     let mut terrain = terrain;
-    for (i, (cold, warm, line)) in snow_bands().into_iter().enumerate() {
-        terrain = terrain.rule(
-            BiomeRule::new("snowy_peaks")
-                .named(&format!("snow_line_{i}"))
-                .field(relief::HIGHLAND, relief::MOUNTAINS_BIOME..)
-                .field("base:alpine", cold..warm)
-                .height(line..),
-        );
-    }
-    for rule in relief::alpine_rules() {
+    for rule in belts::rules() {
         terrain = terrain.rule(rule);
     }
     terrain
