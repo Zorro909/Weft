@@ -15,6 +15,8 @@ use weft_noise::fixed::{ONE, div_floor, fbm, hash, perlin2, perlin3, q4, q12, ra
 use crate::entries::Entry;
 use crate::gpu_layout::terrain::limit;
 
+mod steep;
+
 fn step(kind: u32, a: i32) -> ExprStep {
     ExprStep { kind, a, ..Default::default() }
 }
@@ -51,6 +53,9 @@ pub(crate) fn merge(rule: &mut BiomeRule, edit: &BiomeRule) {
     }
     if has(rf::BARE_ABOVE) {
         rule.bare_above = edit.bare_above;
+    }
+    if has(rf::BARE_STEEPER) {
+        rule.bare_steeper = edit.bare_steeper;
     }
     if has(rf::FROZEN) {
         rule.ice.clone_from(&edit.ice);
@@ -195,6 +200,8 @@ pub struct Rule {
     pub under: Option<(u32, i32)>,
     pub deep_top: Option<(u32, i32)>,
     pub bare_above: Option<i32>,
+    /// Plain stone where the ground is steeper than this (`steep::steepness`'s unit).
+    pub bare_steeper: Option<i32>,
     pub ice: Option<u32>,
 }
 
@@ -398,6 +405,10 @@ pub fn build(dimension: &str, e: &Entry, names: &Names, errors: &mut Vec<String>
             under: block(&r.under, &what, errors).map(|b| (b, r.under_layers)),
             deep_top: block(&r.deep_top, &what, errors).map(|b| (b, r.deep_below)),
             bare_above: (r.bare_above != i32::MAX).then_some(r.bare_above),
+            bare_steeper: r
+                .bare_steeper
+                .is_finite()
+                .then(|| q4(r.bare_steeper).clamp(0, steep::STEEPEST)),
             ice: block(&r.ice, &what, errors),
         });
     }
@@ -536,16 +547,12 @@ impl Terrain {
             (y - gy) as usize,
             (z - gz) as usize,
         );
-        let corners = [(0, 0), (1, 0), (0, 1), (1, 1)].map(|(dx, dz)| self.column(seed, gx + dx * 4, gz + dz * 4).height);
-        carves(t > 0, c, cavern_roof(seed, x, z), smooth4(corners, x - gx, z - gz) - y * 16)
+        carves(t > 0, c, cavern_roof(seed, x, z), smooth4(self.cell(seed, gx, gz), x - gx, z - gz) - y * 16)
     }
 
-    /// What rule `rule` puts at the top of a column `h` high, before caves.
+    /// What rule `rule` puts at the top of a column `h` high that isn't bare, before caves.
     fn surface_of(&self, rule: u32, h: i32) -> u32 {
         let Some(r) = self.rules.get(rule as usize) else { return self.stone };
-        if r.bare_above.is_some_and(|y| h > y) {
-            return self.stone;
-        }
         match r.deep_top {
             Some((b, below)) if h < below => b,
             _ => r.top.unwrap_or(self.stone),
@@ -562,10 +569,12 @@ impl Terrain {
     pub fn read(&self, seed: u64, x: i32, y: i32, z: i32) -> u32 {
         let cols = self.columns(seed, x.div_euclid(16), z.div_euclid(16));
         let i = (z.rem_euclid(16) * 16 + x.rem_euclid(16)) as usize;
-        self.state(seed, y, cols.cols[i].height, cols.rules[i], self.carved_at(seed, x, y, z))
+        let (h, rule) = (cols.cols[i].height, cols.rules[i]);
+        let bare = self.bare(rule, h, || self.steepness_at(seed, x, z));
+        self.state(seed, y, h, rule, bare, self.carved_at(seed, x, y, z))
     }
 
-    fn state(&self, seed: u64, y: i32, h: i32, rule: u32, carved: bool) -> u32 {
+    fn state(&self, seed: u64, y: i32, h: i32, rule: u32, bare: bool, carved: bool) -> u32 {
         let sea = self.sea.map_or(i32::MIN, |s| s.0);
         let rule_def = self.rules.get(rule as usize);
         if let Some(c) = self.caves.as_ref().filter(|_| carved) {
@@ -588,7 +597,7 @@ impl Terrain {
                 0
             };
         }
-        if rule_def.and_then(|r| r.bare_above).is_some_and(|v| h > v) {
+        if bare {
             return self.stone;
         }
         if y == h {
@@ -647,6 +656,7 @@ impl Terrain {
                 let h = cols.cols[i].height;
                 let closed = if cave.is_some() { cavern_roof(seed, ox + x as i32, oz + z as i32) } else { 0 };
                 let smooth = Self::smooth(&corners, x, z);
+                let bare = self.bare(cols.rules[i], h, || steep::in_cube(&corners, x, z));
                 // Keeps a seal under water so seas and canyons do not drain into caves.
                 let carved = |ly: usize| {
                     let Some(cave) = &cave else { return false };
@@ -656,7 +666,7 @@ impl Terrain {
                 };
                 for y in 0..16usize {
                     let wy = oy + y as i32;
-                    blocks[(y * 16 + z) * 16 + x] = self.state(seed, wy, h, cols.rules[i], carved(y));
+                    blocks[(y * 16 + z) * 16 + x] = self.state(seed, wy, h, cols.rules[i], bare, carved(y));
                 }
             }
         }
@@ -821,6 +831,7 @@ mod tests {
             under: None,
             deep_top: None,
             bare_above: None,
+            bare_steeper: None,
             ice: None,
         }
     }
@@ -1010,6 +1021,7 @@ mod tests {
             depth: 3,
             deep_below: i32::MIN,
             bare_above: i32::MAX,
+            bare_steeper: f64::INFINITY,
             ..Default::default()
         }
     }

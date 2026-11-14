@@ -165,6 +165,7 @@ r.biome(&DESERT).temperature(0.35..).humidity(..0.0).surface("sand", "sand", 3).
 - `under(block, layers)`: the lowest layers of filler become another block (sandstone under sand)
 - `deep_top(block, below)`: a different top block where the ground is lower than `below` (gravel on a sea floor)
 - `bare_above(y)`: plain stone above this height
+- `bare_steeper(rise)`: plain stone where the ground rises more than `rise` blocks per block, so cliffs show their rock (1.0 is 45 degrees; the slope is taken over 4 blocks, so a single step doesn't count)
 - `frozen(block)`: the water surface turns into this block, and the biome gets the tag `frozen` (base grows no flowers there)
 - `tint(&kind, color)`: what blocks tinted with that kind take here, `tints::GRASS`, `FOLIAGE`, `WATER` or a mod's own kind. Kinds you don't give keep their default, a kind given again takes the new color. To color another mod's biome with your kind, `r.edit(&PLAINS).tint(&kind, color)`.
 - `snows()`: rain falls as snow here
