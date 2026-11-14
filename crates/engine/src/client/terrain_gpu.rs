@@ -122,6 +122,18 @@ pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<Vec<i32>> {
         ];
         w[at + i * rw..at + (i + 1) * rw].copy_from_slice(&rule);
     }
+    if let Some(erosion) = &t.erosion {
+        let mask = erosion
+            .mask
+            .as_ref()
+            .map_or((0, 0), |mask| steps(&mut w, mask, seed));
+        w[d::EROSION_SIZE as usize..=d::EROSION_MASK_LEN as usize].copy_from_slice(&[
+            erosion.size.clamp(64, 4096),
+            erosion.depth,
+            mask.0,
+            mask.1,
+        ]);
+    }
     w[d::CAVE_OFF as usize] = w.len() as i32;
     for (k, b) in t.cave_biomes.iter().enumerate() {
         let cave: [i32; words::CAVE as usize] =

@@ -1149,7 +1149,7 @@ pub mod comp {
     /// (`[Landform]`), `MASKS` (`[LandformMask]`), `RULES` (`[BiomeRule]`, tried in order:
     /// the first that fits wins, the last where none does), `RULE_EDITS` (`[BiomeRule]`: what
     /// each one's `fields` give replaces that of the rule of its name), `CAVE_BIOMES`
-    /// (`[CaveBiome]`).
+    /// (`[CaveBiome]`), `EROSION` (`TerrainErosion`, none).
     pub mod terrain {
         pub const STONE: &str = "terrain.stone";
         pub const BASE_HEIGHT: &str = "terrain.base_height";
@@ -1161,6 +1161,7 @@ pub mod comp {
         pub const RULES: &str = "terrain.rules";
         pub const RULE_EDITS: &str = "terrain.rule_edits";
         pub const CAVE_BIOMES: &str = "terrain.cave_biomes";
+        pub const EROSION: &str = "terrain.erosion";
     }
 
     /// An item's own (`entry_kind::ITEM`), besides the shared ones (`max_stack`, `durability`,
@@ -5831,6 +5832,13 @@ crate::data! {
     /// A biome in whole cubes (`comp::terrain::CAVE_BIOMES`): biome `name` at least `depth`
     /// blocks under the surface, where a 3D noise of patches `size` across is above `threshold`.
     pub struct CaveBiome { pub name: alloc::string::String, pub depth: i32, pub size: f64, pub threshold: f64 }
+}
+
+crate::data! {
+    /// Gullies cut into a terrain's slopes after its landforms (`comp::terrain::EROSION`): `size`
+    /// blocks apart and about `depth` deep, with finer ones branching into them, at the strength
+    /// of `mask` (0 to 4096; none where it isn't above 0; empty: everywhere at full strength).
+    pub struct TerrainErosion { pub size: f64, pub depth: f64, pub mask: alloc::vec::Vec<ExprStep> }
 }
 
 crate::data! {

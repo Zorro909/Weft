@@ -218,16 +218,129 @@ struct Column {
     rule: i32,
 }
 
-// Column at block (`bx`, `bz`).
-fn column(bx: i32, bz: i32) -> Column {
-    let x = bx * 16;
-    let z = bz * 16;
-    var fv: array<i32, LIMIT_FIELDS>;
+// `weft_noise::gullies`, with its constants.
+const GULLY_OCTAVES: u32 = 3u;
+const GULLY_SPAN: i32 = 32;
+const GULLY_DIAGONAL: i32 = 16 * GULLY_SPAN;
+const GULLY_ONSET_FROM: i32 = GULLY_DIAGONAL * 5 / 8;
+const GULLY_ONSET_TO: i32 = GULLY_DIAGONAL * 3 / 2;
+const GULLY_STEEPEST: i32 = 16384;
+const GULLY_MARGIN: i32 = 1024;
+const GULLY_REACH: i32 = 5120;
+const GULLY_SHARPEN: i32 = 2;
+const GULLY_SIDE: i32 = GULLY_DIAGONAL * 355 / 113;
+
+fn isqrt(v: u32) -> u32 {
+    var rest = v;
+    var root = 0u;
+    var bit = 1u << 30u;
+    while (bit > rest) {
+        bit >>= 2u;
+    }
+    while (bit != 0u) {
+        if (rest >= root + bit) {
+            rest -= root + bit;
+            root = (root >> 1u) + bit;
+        } else {
+            root >>= 1u;
+        }
+        bit >>= 2u;
+    }
+    return root;
+}
+
+fn sine(turns: i32) -> i32 {
+    let half = turns & (ONE / 2 - 1);
+    let arc = (half * (ONE / 2 - half)) >> 8u;
+    if ((turns & (ONE / 2)) == 0) {
+        return arc;
+    }
+    return -arc;
+}
+
+fn eased(share: i32) -> i32 {
+    let rest = ONE - clamp(share, 0, ONE);
+    return ONE - ((rest * rest) >> 12u);
+}
+
+fn length2(x: i32, z: i32) -> i32 {
+    return i32(isqrt(u32(x * x + z * z)));
+}
+
+// Cosine and sine of where (x, z) is across the stripes.
+fn stripes(s: u32, x: i32, z: i32, size: i32, along_x: i32, along_z: i32) -> vec2<i32> {
+    let cell_x = div_floor(x, size).x;
+    let cell_z = div_floor(z, size).x;
+    var cos = 0;
+    var sin = 0;
+    var weight = 0;
+    for (var dz = -1; dz <= 1; dz++) {
+        for (var dx = -1; dx <= 1; dx++) {
+            let h = hash(s, cell_x + dx, 0, cell_z + dz);
+            let pivot_x = (cell_x + dx) * size + (((GULLY_MARGIN + i32(h & 4095u) / 2) * size) >> 12u);
+            let pivot_z = (cell_z + dz) * size + (((GULLY_MARGIN + i32((h >> 12u) & 4095u) / 2) * size) >> 12u);
+            let off_x = (x - pivot_x) * ONE / size;
+            let off_z = (z - pivot_z) * ONE / size;
+            let near = max(((GULLY_REACH * GULLY_REACH) >> 12u) - ((off_x * off_x + off_z * off_z) >> 12u), 0);
+            let w = (near * near) >> 12u;
+            let across = (off_z * along_x - off_x * along_z) >> 12u;
+            cos += w * sine(across + ONE / 4);
+            sin += w * sine(across);
+            weight += w;
+        }
+    }
+    if (weight == 0) {
+        return vec2<i32>(0, 0);
+    }
+    cos = cos / weight;
+    sin = sin / weight;
+    let strength = length2(cos, sin);
+    if (strength == 0) {
+        return vec2<i32>(0, 0);
+    }
+    if (strength * GULLY_SHARPEN >= ONE) {
+        return vec2<i32>(cos * ONE / strength, sin * ONE / strength);
+    }
+    return vec2<i32>(cos * GULLY_SHARPEN, sin * GULLY_SHARPEN);
+}
+
+fn gullies(s: u32, x: i32, z: i32, rise_x: i32, rise_z: i32, size0: i32, depth: i32) -> i32 {
+    let size = clamp(size0, 64, 4096);
+    var slope_x = clamp(rise_x, -GULLY_STEEPEST, GULLY_STEEPEST);
+    var slope_z = clamp(rise_z, -GULLY_STEEPEST, GULLY_STEEPEST);
+    var share = eased(ramp(length2(slope_x, slope_z), GULLY_ONSET_FROM, GULLY_ONSET_TO));
+    if (share == 0) {
+        return 0;
+    }
+    let side = min(GULLY_SIDE * clamp(depth, 0, 16384) / size, GULLY_STEEPEST);
+    var cut = 0;
+    for (var octave = 0u; octave < GULLY_OCTAVES; octave++) {
+        let steepness = length2(slope_x, slope_z);
+        if (steepness == 0) {
+            break;
+        }
+        let down_x = slope_x * ONE / steepness;
+        let down_z = slope_z * ONE / steepness;
+        let wave = stripes(s + octave * 7919u, x, z, size >> octave, down_x, down_z);
+        cut += ((((depth >> octave) * (ONE - wave.x)) >> 13u) * share) >> 12u;
+        var lean = side;
+        if (wave.y > 0) {
+            lean = -side;
+        }
+        slope_x = clamp(slope_x - ((down_z * lean) >> 12u), -GULLY_STEEPEST, GULLY_STEEPEST);
+        slope_z = clamp(slope_z + ((down_x * lean) >> 12u), -GULLY_STEEPEST, GULLY_STEEPEST);
+        share = (share * eased(abs(wave.y))) >> 12u;
+    }
+    return cut;
+}
+
+// The ground at (x, z) (Q4) before erosion and the fields there (`fv`), as `Terrain::ground`.
+fn ground(x: i32, z: i32, fv: ptr<function, array<i32, LIMIT_FIELDS>>) -> i32 {
     let nfi = u32(desc[D_FIELDS]);
     let fio = u32(desc[D_FIELD_OFF]);
     for (var i = 0u; i < nfi; i++) {
         let f = fio + i * WORDS_FIELD;
-        fv[i] = eval(u32(desc[f]), u32(desc[f + 1u]), x, z, &fv);
+        (*fv)[i] = eval(u32(desc[f]), u32(desc[f + 1u]), x, z, fv);
     }
     var h = desc[D_BASE];
     let nf = u32(desc[D_FEATURES]);
@@ -236,12 +349,40 @@ fn column(bx: i32, bz: i32) -> Column {
         let f = fo + i * WORDS_FEATURE;
         var w = ONE;
         if (desc[f + 3u] > 0) {
-            w = min(eval(u32(desc[f + 2u]), u32(desc[f + 3u]), x, z, &fv), ONE);
+            w = min(eval(u32(desc[f + 2u]), u32(desc[f + 3u]), x, z, fv), ONE);
         }
         if (w > 0) {
-            h += (w * clamp(eval(u32(desc[f]), u32(desc[f + 1u]), x, z, &fv), -262144, 262144)) >> 12u;
+            h += (w * clamp(eval(u32(desc[f]), u32(desc[f + 1u]), x, z, fv), -262144, 262144)) >> 12u;
         }
     }
+    return h;
+}
+
+// How far erosion cuts into the ground at (x, z), `h` high before it, as `Terrain::cut`.
+fn cut(x: i32, z: i32, h: i32, fv: ptr<function, array<i32, LIMIT_FIELDS>>) -> i32 {
+    if (desc[D_EROSION_SIZE] == 0) {
+        return 0;
+    }
+    var strength = ONE;
+    if (desc[D_EROSION_MASK_LEN] > 0) {
+        strength = min(eval(u32(desc[D_EROSION_MASK]), u32(desc[D_EROSION_MASK_LEN]), x, z, fv), ONE);
+    }
+    if (strength <= 0) {
+        return 0;
+    }
+    var other: array<i32, LIMIT_FIELDS>;
+    let east = ground(x + GULLY_SPAN * 16, z, &other) - h;
+    let south = ground(x, z + GULLY_SPAN * 16, &other) - h;
+    return (gullies(seed(S_EROSION), x, z, east, south, desc[D_EROSION_SIZE], desc[D_EROSION_DEPTH]) * strength) >> 12u;
+}
+
+// Column at block (`bx`, `bz`).
+fn column(bx: i32, bz: i32) -> Column {
+    let x = bx * 16;
+    let z = bz * 16;
+    var fv: array<i32, LIMIT_FIELDS>;
+    let before = ground(x, z, &fv);
+    let h = before - cut(x, z, before, &fv);
     let height = h >> 4u;
     let nr = u32(desc[D_RULES]);
     let ro = u32(desc[D_RULE_OFF]);

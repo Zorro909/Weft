@@ -257,6 +257,14 @@ The presets' own formulas in `crates/sdk/src/terrain.rs` are the easiest start: 
 preset::hills(16.0, 110.0).mask(Expr::temperature().ramp(-0.35, -0.6).not())
 ```
 
+### Erosion
+`.erosion(Erosion::new(size, depth))` cuts gullies into the slopes of everything the landforms add up to: they run down the slope about `size` blocks apart and `depth` deep, finer ones branch into them, and the spurs between them keep their height, so erosion never raises the ground. Gentle ground (rising less than 5 blocks in 8) stays as it is. `.mask(expr)` limits it like a landform's mask. Base erodes its mountain ranges and massifs:
+
+```rust
+.erosion(Erosion::new(64.0, 12.0).mask(Expr::field("base:range").ramp(0.0, 0.3).max(Expr::field("base:mountains"))))
+```
+A column's slope is how much the ground rises over 32 blocks to the east and south, so an eroded column costs three times the landforms of a plain one: mask it down to where it shows.
+
 ### Fields
 A field is a named value over the whole terrain. `temperature`, `humidity` and `continent` come with every terrain (all about -1.4 to 1.4, continentalness below 0 is sea); `.field(name, expr)` declares your own. Masks and other fields use one with `Expr::field(name)`, and biome rules ask for it. It's worked out once per column however many things use it, so one mask shared by a landform and a biome goes here. Base's mountains, shortened:
 

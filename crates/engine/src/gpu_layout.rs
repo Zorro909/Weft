@@ -141,11 +141,14 @@ pub mod terrain {
             LAVA_FROM = 7, LAVA_TO = 8, FIELDS = 9, FEATURES = 10, RULES = 11, CAVE_BIOMES = 12,
             /// The noise seeds, in `SEEDS` order.
             SEEDS = 13,
-            FIELD_OFF = 18, FEAT_OFF = 19, RULE_OFF = 20, CAVE_OFF = 21,
+            FIELD_OFF = 19, FEAT_OFF = 20, RULE_OFF = 21, CAVE_OFF = 22,
             /// Distant terrain's scattered things (`describe_lod`).
-            SCATTER_OFF = 22,
+            SCATTER_OFF = 23,
+            /// Erosion: how far apart and how deep its gullies are (Q4; a size of 0: none), and
+            /// where its mask's steps start and how many they are (0: full strength everywhere).
+            EROSION_SIZE = 24, EROSION_DEPTH = 25, EROSION_MASK = 26, EROSION_MASK_LEN = 27,
             /// The header's length.
-            LEN = 23,
+            LEN = 28,
         }
         /// Words per record of the description and per cube made. A rule is: biome, lowest and
         /// highest surface height, the word where its conditions start and how many there
@@ -212,8 +215,14 @@ pub mod terrain {
 
     /// The noise seeds the description carries from `d::SEEDS` on, the shader's `S_<name>`:
     /// made from the salts the CPU uses.
-    pub const SEEDS: [(&str, u64); 5] =
-        [("C1", salt::CAVE_A), ("C2", salt::CAVE_B), ("C3", salt::CAVERN), ("C4", salt::CAVERN_ROOF), ("LAKE", salt::LAVA)];
+    pub const SEEDS: [(&str, u64); 6] = [
+        ("C1", salt::CAVE_A),
+        ("C2", salt::CAVE_B),
+        ("C3", salt::CAVERN),
+        ("C4", salt::CAVERN_ROOF),
+        ("LAKE", salt::LAVA),
+        ("EROSION", salt::EROSION),
+    ];
 
     /// What goes in front of `terrain.wgsl`: the constants, the seeds' indices, the bindings
     /// and the push constants.

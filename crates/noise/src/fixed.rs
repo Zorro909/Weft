@@ -25,6 +25,7 @@ pub mod salt {
     pub const LAVA: u64 = 0x1A7A;
     /// Cave biome `k` uses `CAVE_BIOME ^ k`.
     pub const CAVE_BIOME: u64 = 0xCB10;
+    pub const EROSION: u64 = 0xE40D;
 }
 
 /// 1.0 in Q12.

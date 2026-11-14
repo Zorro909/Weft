@@ -508,6 +508,29 @@ fn range_i32(r: impl RangeBounds<i32>) -> (i32, i32) {
     (min, max)
 }
 
+/// Gullies cut into the slopes of a terrain once its landforms are added up: they run down
+/// the slope, finer ones branch into them, and the spurs between them keep the height the
+/// landforms gave. Gentle ground stays as it is.
+pub struct Erosion {
+    size: f64,
+    depth: f64,
+    mask: Option<Expr>,
+}
+
+impl Erosion {
+    /// Gullies about `size` blocks apart and `depth` blocks deep; with the finer ones in them a
+    /// cut reaches down to 1.75 times that.
+    pub fn new(size: f64, depth: f64) -> Erosion {
+        Erosion { size, depth, mask: None }
+    }
+
+    /// Where it applies, 0..1, like a landform's mask: none where it is 0 or less.
+    pub fn mask(mut self, mask: Expr) -> Erosion {
+        self.mask = Some(mask);
+        self
+    }
+}
+
 /// Two-noise tunnels plus large caverns. Between `lava_from` and `lava_to` some layers of height
 /// hold flat lava lakes.
 pub struct Caves {
@@ -569,6 +592,11 @@ impl TerrainBuilder<'_> {
     pub fn caves(self, caves: Caves) -> Self {
         let lava = self.q(&caves.lava);
         self.set(&t::CAVES, abi::TerrainCaves { lava, from: caves.lava_from, to: caves.lava_to })
+    }
+    /// Erodes the slopes of the terrain; given again, the new one takes the old one's place.
+    pub fn erosion(self, erosion: Erosion) -> Self {
+        let mask = erosion.mask.map_or(Vec::new(), |mask| mask.0);
+        self.set(&t::EROSION, abi::TerrainErosion { size: erosion.size, depth: erosion.depth, mask })
     }
     /// A named value over the terrain's columns, for biome rules (`BiomeRule::field`) and
     /// other expressions (`Expr::field`), worked out once per column. The name is used as written:

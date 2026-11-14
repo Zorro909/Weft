@@ -481,6 +481,7 @@ pub mod terrain {
     pub static RULES: Component<Vec<abi::BiomeRule>, Terrain> = Component::named(t::RULES);
     pub static RULE_EDITS: Component<Vec<abi::BiomeRule>, Terrain> = Component::named(t::RULE_EDITS);
     pub static CAVE_BIOMES: Component<Vec<abi::CaveBiome>, Terrain> = Component::named(t::CAVE_BIOMES);
+    pub static EROSION: Component<abi::TerrainErosion, Terrain> = Component::named(t::EROSION);
 }
 
 /// An item's own (`abi::comp::item`), besides the shared ones (`component::MAX_STACK`..).
