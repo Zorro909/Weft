@@ -420,7 +420,11 @@ async fn place_bed(t: &T) -> Result<[i32; 3], String> {
     t.op("put me 0 bed 1").await?;
     t.c().select_slot(0);
     let foot = add(f, [0, 0, -2]);
-    t.look_at(add(foot, [0, -1, 0]));
+    let floor = add(foot, [0, -1, 0]);
+    // Right after a far teleport the client has the cube before the server sends its edits.
+    t.until("the floor on the client", Duration::from_secs(2), |t| t.c().block(floor).is_some_and(|s| s != 0))
+        .await?;
+    t.look_at(floor);
     t.frames(2).await?;
     t.press("core:use");
     for _ in 0..30 {
@@ -728,6 +732,9 @@ pub async fn beds_far(t: T) -> R {
     t.secs(0.2).await?;
     t.c().set_flying(true);
     t.loaded().await?;
+    // The fall until here has drifted out: a floor built under moving feet ends up around them.
+    t.until("hovering", Duration::from_secs(2), |t| t.state().vel.y.abs() < 1e-4)
+        .await?;
     let foot = place_bed(&t).await?;
     t.look_at(foot);
     t.frames(2).await?;
