@@ -24,10 +24,8 @@ pub const RANGE_BIOME: f64 = 0.25;
 pub const MOUNTAINS_BIOME: f64 = 0.45;
 /// A range's forest starts at this y; below it the lowland's biomes go on.
 pub const RANGE_FOREST_FROM: i32 = 110;
-/// No trees from this y up.
-pub const TREE_LINE: i32 = 200;
-/// Bare stone above this y.
-const ROCK_FROM: i32 = 250;
+/// Field: how far a column is from the line a valley through a range follows, 0 on it.
+pub const VALLEY: &str = "base:valley";
 /// Ground rising more than this many blocks per block is a cliff: bare stone in the mountains.
 pub const CLIFF: f64 = 1.5;
 
@@ -59,8 +57,10 @@ const SADDLE_DROP: f64 = 0.28;
 /// The sizes in blocks of the noises a range's largest ridges and the valleys through it follow.
 const RIDGE_SIZE: f64 = 800.0;
 const VALLEY_SIZE: f64 = 1300.0;
-/// The share of the height a valley floor keeps.
+/// The share of the height a valley floor keeps, and how far from the valley's line (`VALLEY`)
+/// the floor reaches.
 const VALLEY_FLOOR: f64 = 0.5;
+const VALLEY_FLOOR_WIDTH: f64 = 0.012;
 /// Ridges and valleys are bent by up to this many blocks, in bends about `BEND_SIZE` long.
 const BEND: f64 = 70.0;
 const BEND_SIZE: f64 = 300.0;
@@ -77,6 +77,9 @@ const PLAIN_HILLS: f64 = 4.0;
 const UPLAND_HILLS: f64 = 34.0;
 const HILL_SIZE: f64 = 170.0;
 const RELIEF_SIZE: f64 = 1600.0;
+
+/// The share of the squares of a range's meadow that a tree stands in.
+const MEADOW_TREES: f32 = 0.04;
 
 /// How far a ridge noise is from zero where its ridge meets the flat floor: smaller ridges
 /// are narrower.
@@ -104,20 +107,10 @@ mod salt {
     pub const HILLS: u64 = weft_sdk::noise::fixed::salt::HILLS;
 }
 
-/// Noise the alpine biome's rock line follows, so it doesn't run along a contour.
-pub const ROCK: &str = "base:rock";
-/// Blocks across the patches the rock line frays into
-const ROCK_PATCH: f64 = 44.0;
-/// Blocks the patches move the rock line up and down, in `ROCK_BANDS` steps
-const ROCK_FRAY: i32 = 45;
-const ROCK_BANDS: i32 = 9;
-/// The `ROCK` noise mostly stays within this
-const ROCK_NOISE: f64 = 0.45;
-
 pub static RANGE_FOREST: Biome = Biome::named("range_forest");
 pub static RANGE_ALPINE: Biome = Biome::named("range_alpine");
 
-/// The biomes of a mountain range below its snow: forest, then meadow and bare rock.
+/// The biomes of a mountain range below its snow: forest, then meadow with the last trees.
 pub fn biomes(r: &mut Registry) {
     let (grass, foliage) = (&tints::GRASS, &tints::FOLIAGE);
     r.biome(&RANGE_FOREST)
@@ -134,37 +127,15 @@ pub fn biomes(r: &mut Registry) {
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&RANGE_ALPINE)
         .surface("grass", "dirt", 3)
-        .bare_above(ROCK_FROM)
         .bare_steeper(CLIFF)
         .tint(grass, 0x8ab689)
         .tint(foliage, 0x6da36b)
         .tag("mountain")
         .tag("mountain_range")
         .tag("animals")
-        .set(&GRASS_COVER, 0.2);
-}
-
-pub fn rock_field() -> Expr {
-    Expr::noise(ROCK_PATCH) + Expr::noise(ROCK_PATCH / 4.0) * Expr::value(0.5)
-}
-
-/// The alpine biome above the tree line, one rule per band of `ROCK`: each starts its bare rock
-/// at another height.
-pub fn alpine_rules() -> Vec<BiomeRule> {
-    let edge = |i: i32| ROCK_NOISE * f64::from(2 * i - ROCK_BANDS) / f64::from(ROCK_BANDS);
-    (0..ROCK_BANDS)
-        .map(|i| {
-            let from = if i == 0 { f64::NEG_INFINITY } else { edge(i) };
-            let to = if i == ROCK_BANDS - 1 { f64::INFINITY } else { edge(i + 1) };
-            let shift = ROCK_FRAY * (2 * i + 1 - ROCK_BANDS) / ROCK_BANDS;
-            BiomeRule::new("range_alpine")
-                .named(&format!("rock_line_{i}"))
-                .field(RANGE, RANGE_BIOME..)
-                .field(ROCK, from..to)
-                .height(TREE_LINE..)
-                .bare_above(ROCK_FROM + shift)
-        })
-        .collect()
+        .set(&TREES, MEADOW_TREES)
+        .set(&GRASS_COVER, 0.2)
+        .set_text(&TREE_KINDS, "base:spruce_log");
 }
 
 fn range() -> Expr {
@@ -241,6 +212,17 @@ pub fn mountains() -> Landform {
         .named("mountains")
 }
 
+/// `noise` where the bends of a range's ridges and valleys put it.
+fn bent(noise: Expr) -> Expr {
+    let bend = |axis_salt| Expr::fbm(axis_salt, BEND_SIZE, 1) * Expr::blocks(BEND);
+    noise.at(Expr::x() + bend(salt::BEND_X), Expr::z() + bend(salt::BEND_Z))
+}
+
+/// The `VALLEY` field: a valley runs along a zero line of its noise.
+pub fn valley_field() -> Expr {
+    bent(Expr::fbm(salt::VALLEYS, VALLEY_SIZE, 3)).abs()
+}
+
 /// A mountain range: across it foothills, then a rise that steepens toward the spine; along it
 /// peaks and saddles; on it branching ridges, and valleys that cut through.
 pub fn ranges() -> Landform {
@@ -248,15 +230,10 @@ pub fn ranges() -> Landform {
     let across = foothills() * Expr::value(FOOTHILL_SHARE)
         + core() * (Expr::value(0.35) + core() * Expr::value(0.65)) * Expr::value(1.0 - FOOTHILL_SHARE);
     let along = Expr::value(1.0 - SADDLE_DROP) + Expr::fbm(salt::PEAKS, PEAK_SIZE, 2) * Expr::value(SADDLE_DROP);
-    let bend = |axis_salt| Expr::fbm(axis_salt, BEND_SIZE, 1) * Expr::blocks(BEND);
-    let bent = |noise: Expr| noise.at(Expr::x() + bend(salt::BEND_X), Expr::z() + bend(salt::BEND_Z));
     // Under a third of the height everywhere, the rest on the ridges (which reach 2.3).
     let ridged = Expr::value(0.3) + ridges(salt::RIDGES, RIDGE_SIZE, 5, bent) * Expr::value(0.385);
-    // A valley runs along a zero line of its noise with a flat floor; where it crosses the
-    // spine it leaves a pass.
-    let valleys = bent(Expr::fbm(salt::VALLEYS, VALLEY_SIZE, 3))
-        .abs()
-        .ramp(0.012, 0.16);
+    // A valley has a flat floor along its line; where it crosses the spine it leaves a pass.
+    let valleys = Expr::field(VALLEY).ramp(VALLEY_FLOOR_WIDTH, 0.16);
     let cut = Expr::value(VALLEY_FLOOR) + valleys * Expr::value(1.0 - VALLEY_FLOOR);
     let height = (across * along * ridged * cut * Expr::blocks(RANGE_HEIGHT)).min(Expr::blocks(RANGE_CAP));
     // The height is only worked out where there is a range.

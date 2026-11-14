@@ -9,6 +9,7 @@ Examples to copy from:
 - `mods/testmod/src/looks.rs`: an obelisk structure standing in the dry parts of Mars, and outposts grown from pieces joined by their joints, one of them a file in `assets/structures/`
 - `mods/base/src/worldgen.rs`: the overworld, with biomes, caves, trees and flowers
 - `mods/base/src/worldgen/relief.rs`: its hills, mountains and mountain ranges, landforms written as formulas
+- `mods/base/src/worldgen/belts.rs`: the belts up its mountains (meadow, scree, rock, snow, ice), rules whose heights follow fields
 
 ## Quick links
 [how generation works](#how-generation-works) | [features](#features) | [ores](#ores) | [structures](#structures) | [plans](#plans) | [placing and finding](#placing-and-finding) | [spawns](#spawns) | [biomes](#biomes) | [dimensions](#dimensions) | [terrain](#terrain) | [trees](#trees-and-other-scattered-things) | [decorations](#decorations) | [changing another mod's terrain](#changing-another-mods-terrain) | [writing a generator](#writing-a-generator)
@@ -264,13 +265,14 @@ A field is a named value over the whole terrain. `temperature`, `humidity` and `
 .landform(Landform::new(massifs).mask(Expr::field("base:mountains")).named("mountains"))
 .rule(BiomeRule::new("mountains").field("base:mountains", 0.45..))
 ```
-The overworld's other fields are `base:range` (0 outside a mountain range to 1 on its spine; the biomes `range_forest` and `range_alpine` start at 0.25) `base:relief` (0 in plains to 1 in uplands and at the foot of a range), and the noises `base:alpine` and `base:rock` that the snow line and a range's rock line follow, so neither runs along a contour.
+The overworld's other fields are `base:range` (0 outside a mountain range to 1 on its spine; the biomes `range_forest` and `range_alpine` start at 0.25), `base:relief` (0 in plains to 1 in uplands and at the foot of a range), `base:valley` (how far a column is from the line of a valley through a range, 0 on it), and the lengths `base:snow_line` and `base:rock_line`: the heights where snow and a range's bare rock start.
 
 The name is used as written, so give yours your mod's prefix. A field can only use fields declared before it. Declaring one that exists, `temperature` included, replaces it for everything that uses it, which is how a mod gives the whole overworld another climate.
 
 ### Biome rules
 A rule puts a biome into a terrain. It starts from the biome's climate and surface, so `BiomeRule::new("desert")` is a whole rule. Rules are tried in order and the **first one that fits wins**, so specific ones go first and a plain catch-all goes last. What a rule adds is where else it must hold:
 - `height(..)`: the surface height, like `..=SEA + 1`
+- `height_from(field, ..)`: the surface height counted from a field that is a length, so a line can drift and fray instead of running along a contour. Base's snow lies from `base:snow_line` up: `BiomeRule::new("snowy_peaks").height_from("base:snow_line", 0..)`
 - `field(name, range)`: where a field is in a range like `0.45..` (from inclusive, to exclusive); `temperature(..)`, `humidity(..)` and `continent(..)` are the same for those three
 
 Any of the biome's own settings (`temperature`, `surface`, `frozen`...) can also be given on a rule, and then that rule uses its own.
