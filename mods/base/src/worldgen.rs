@@ -177,6 +177,7 @@ pub fn register(r: &mut Registry) {
         .field(relief::MOUNTAINS, relief::mountains_field())
         .landform(relief::mountains())
         .landform(relief::ranges())
+        .erosion(relief::erosion())
         .field(relief::HIGHLAND, relief::highland_field())
         .field(relief::VALLEY, relief::valley_field())
         // Where the belts up a mountain start.
