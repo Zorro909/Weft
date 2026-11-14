@@ -2945,6 +2945,11 @@ impl BiomeBuilder<'_> {
     pub fn bare_above(self, y: i32) -> Self {
         self.set(&crate::comps::biome::BARE_ABOVE, y)
     }
+    /// Plain stone where the ground rises more than `rise` blocks per block (cliffs): 1.0 is a
+    /// slope of 45 degrees. Measured over 4 blocks, so a single step doesn't count.
+    pub fn bare_steeper(self, rise: f64) -> Self {
+        self.set(&crate::comps::biome::BARE_STEEPER, rise)
+    }
     /// A frozen biome: the water surface freezes into `block`, and it has the tag `frozen`
     /// (decorations put no flowers there).
     pub fn frozen(self, block: &str) -> Self {

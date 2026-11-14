@@ -379,6 +379,7 @@ impl BiomeRule {
             depth: 3,
             deep_below: i32::MIN,
             bare_above: i32::MAX,
+            bare_steeper: f64::INFINITY,
             ..Default::default()
         })
     }
@@ -446,6 +447,11 @@ impl BiomeRule {
     /// Plain stone above this height (bare peaks).
     pub fn bare_above(mut self, y: i32) -> Self {
         (self.0.bare_above, self.0.fields) = (y, self.0.fields | rf::BARE_ABOVE);
+        self
+    }
+    /// Plain stone where the ground rises more than `rise` blocks per block (cliffs).
+    pub fn bare_steeper(mut self, rise: f64) -> Self {
+        (self.0.bare_steeper, self.0.fields) = (rise, self.0.fields | rf::BARE_STEEPER);
         self
     }
     /// The water surface freezes into `block`.

@@ -348,6 +348,21 @@ fn surface(x: u32, z: u32) -> i32 {
     return (c00 * (4 - fx) + c10 * fx) * (4 - fz) + (c01 * (4 - fx) + c11 * fx) * fz;
 }
 
+// How steep the surface is at (x, z) (0..4) of a 4 x 4 cell with these corner heights, squared,
+// as `server::terrain::steep::steepness`.
+fn steepness(c00: i32, c10: i32, c01: i32, c11: i32, x: i32, z: i32) -> i32 {
+    let along_x = clamp((c10 - c00) * (4 - z) + (c11 - c01) * z, -16384, 16384);
+    let along_z = clamp((c01 - c00) * (4 - x) + (c11 - c10) * x, -16384, 16384);
+    return along_x * along_x + along_z * along_z;
+}
+
+// `steepness` at column (x, z) of the cube, as `steep::in_cube`.
+fn steepness_in_cube(x: u32, z: u32) -> i32 {
+    let cx = x / 4u;
+    let cz = z / 4u;
+    return steepness(corners[cz * 5u + cx], corners[cz * 5u + cx + 1u], corners[(cz + 1u) * 5u + cx], corners[(cz + 1u) * 5u + cx + 1u], i32(x % 4u), i32(z % 4u));
+}
+
 fn lerp2(a: vec2<i32>, b: vec2<i32>, t: i32) -> vec2<i32> {
     return vec2<i32>(lerp(a.x, b.x, t), lerp(a.y, b.y, t));
 }
@@ -389,6 +404,9 @@ fn block(x: u32, y: u32, z: u32, ox: i32, oy: i32, oz: i32, cave: bool) -> u32 {
     if (ri < nr) {
         let r = u32(desc[D_RULE_OFF]) + ri * WORDS_RULE;
         if (desc[r + 13u] != 0 && h > desc[r + 14u]) {
+            bare = true;
+        }
+        if (desc[r + 15u] >= 0 && steepness_in_cube(x, z) > desc[r + 15u]) {
             bare = true;
         }
         if (desc[r + 5u] >= 0) {
@@ -599,9 +617,29 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
         var under = stone;
         var ice = -1;
         let ri = u32(c.rule);
+        let caves = desc[D_HAS_CAVES] != 0 && (desc[D_HAS_SEA] == 0 || c.height > desc[D_SEA]);
+        var steeper = -1;
+        if (ri < nr) {
+            steeper = desc[u32(desc[D_RULE_OFF]) + ri * WORDS_RULE + 15u];
+        }
+        // The corner heights of the column's 4 x 4 cell, which cliffs and caves go by.
+        let gx = div_floor(bx, 4).x * 4;
+        let gz = div_floor(bz, 4).x * 4;
+        let fx = bx - gx;
+        let fz = bz - gz;
+        var c00 = 0;
+        var c10 = 0;
+        var c01 = 0;
+        var c11 = 0;
+        if (caves || steeper >= 0) {
+            c00 = column(gx, gz).height;
+            c10 = column(gx + 4, gz).height;
+            c01 = column(gx, gz + 4).height;
+            c11 = column(gx + 4, gz + 4).height;
+        }
         if (ri < nr) {
             let r = u32(desc[D_RULE_OFF]) + ri * WORDS_RULE;
-            let bare = desc[r + 13u] != 0 && c.height > desc[r + 14u];
+            let bare = (desc[r + 13u] != 0 && c.height > desc[r + 14u]) || (steeper >= 0 && steepness(c00, c10, c01, c11, fx, fz) > steeper);
             if (!bare) {
                 if (desc[r + 5u] >= 0) {
                     top = desc[r + 5u];
@@ -626,15 +664,7 @@ fn lod(@builtin(workgroup_id) wg: vec3<u32>, @builtin(local_invocation_index) t:
             over = (u32(desc[D_SEA]) & 65535u) | (u32(surface) << 16u);
         }
         // Where caves open the ground, the floor they leave, as far down as distance shows.
-        if (desc[D_HAS_CAVES] != 0 && (desc[D_HAS_SEA] == 0 || c.height > desc[D_SEA])) {
-            let gx = div_floor(bx, 4).x * 4;
-            let gz = div_floor(bz, 4).x * 4;
-            let fx = bx - gx;
-            let fz = bz - gz;
-            let c00 = column(gx, gz).height;
-            let c10 = column(gx + 4, gz).height;
-            let c01 = column(gx, gz + 4).height;
-            let c11 = column(gx + 4, gz + 4).height;
+        if (caves) {
             let ground = (c00 * (4 - fx) + c10 * fx) * (4 - fz) + (c01 * (4 - fx) + c11 * fx) * fz;
             var wy = c.height;
             while (wy > c.height - 48 && carved_at(bx, wy, bz, ground)) {

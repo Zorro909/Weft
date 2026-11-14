@@ -162,6 +162,7 @@ A biome's climate, surface and colors; terrain rules placing it start from these
 | `UNDER`, `UNDER_LAYERS` | `str`, `i32` | none, 0 | `.under` |
 | `DEEP_TOP`, `DEEP_BELOW` | `str`, `i32` | none | `.deep_top` |
 | `BARE_ABOVE` | `i32` | none | `.bare_above` |
+| `BARE_STEEPER` | `f64` | none | `.bare_steeper` |
 | `ICE` | `str` | none | `.frozen` (also tags `frozen`) |
 | `TINTS` | `[BiomeTint]` | each kind's default | `.tint(&kind, color)`, a kind given again wins |
 

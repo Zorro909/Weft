@@ -512,6 +512,7 @@ pub mod biome {
     pub static DEEP_TOP: Component<Text, Biome> = Component::named(b::DEEP_TOP);
     pub static DEEP_BELOW: Component<i32, Biome> = Component::named(b::DEEP_BELOW);
     pub static BARE_ABOVE: Component<i32, Biome> = Component::named(b::BARE_ABOVE);
+    pub static BARE_STEEPER: Component<f64, Biome> = Component::named(b::BARE_STEEPER);
     pub static ICE: Component<Text, Biome> = Component::named(b::ICE);
     pub static TINTS: Component<Vec<abi::BiomeTint>, Biome> = Component::named(b::TINTS);
 }

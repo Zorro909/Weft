@@ -2480,6 +2480,7 @@ fn number_biomes(
                 deep_top: text(b::DEEP_TOP),
                 deep_below: e.or(b::DEEP_BELOW, i32::MIN),
                 bare_above: e.or(b::BARE_ABOVE, i32::MAX),
+                bare_steeper: e.or(b::BARE_STEEPER, f64::INFINITY),
                 ice: text(b::ICE),
             };
             (BiomeDef { name: e.name.clone(), tints }, e.components("biome."), rule)

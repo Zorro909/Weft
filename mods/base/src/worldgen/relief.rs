@@ -28,6 +28,8 @@ pub const RANGE_FOREST_FROM: i32 = 110;
 pub const TREE_LINE: i32 = 200;
 /// Bare stone above this y.
 const ROCK_FROM: i32 = 250;
+/// Ground rising more than this many blocks per block is a cliff: bare stone in the mountains.
+pub const CLIFF: f64 = 1.5;
 
 /// The size in blocks of the noise whose zero lines the spines of ranges follow.
 const SPINE_SIZE: f64 = 12000.0;
@@ -116,12 +118,14 @@ pub fn biomes(r: &mut Registry) {
         .tag("mountain_range")
         .tag("forest")
         .tag("animals")
+        .bare_steeper(CLIFF)
         .set(&TREES, 0.45)
         .set(&GRASS_COVER, 0.08)
         .set_text(&TREE_KINDS, "base:spruce_log");
     r.biome(&RANGE_ALPINE)
         .surface("grass", "dirt", 3)
         .bare_above(ROCK_FROM)
+        .bare_steeper(CLIFF)
         .tint(grass, 0x8ab689)
         .tint(foliage, 0x6da36b)
         .tag("mountain")

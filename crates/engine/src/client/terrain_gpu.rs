@@ -117,6 +117,7 @@ pub fn describe(c: &Content, dim: u32, seed: u64) -> Option<Vec<i32>> {
             opt(r.ice),
             bare.0,
             bare.1,
+            r.bare_steeper.map_or(-1, |steepness| steepness * steepness),
         ];
         w[at + i * rw..at + (i + 1) * rw].copy_from_slice(&rule);
     }

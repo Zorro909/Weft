@@ -1269,7 +1269,8 @@ pub mod comp {
     /// it starts from (`BiomeRule` says what each is): `RANGES` (`[RuleRange]`, a field named again
     /// replaces the earlier range; none: everywhere), `HEIGHT` (`[i32;2]`, any), `TOP`, `FILLER`
     /// (`str`, none: stone), `DEPTH` (`i32`, 3), `UNDER` (`str`), `UNDER_LAYERS` (`i32`, 0),
-    /// `DEEP_TOP` (`str`), `DEEP_BELOW` (`i32`), `BARE_ABOVE` (`i32`), `ICE` (`str`). `TINTS`
+    /// `DEEP_TOP` (`str`), `DEEP_BELOW` (`i32`), `BARE_ABOVE` (`i32`), `BARE_STEEPER` (`f64`),
+    /// `ICE` (`str`). `TINTS`
     /// (`[BiomeTint]`, a kind given again wins; the others keep their default). Any other
     /// component goes in its component table (`precipitation`, scatters' densities).
     pub mod biome {
@@ -1283,6 +1284,7 @@ pub mod comp {
         pub const DEEP_TOP: &str = "biome.deep_top";
         pub const DEEP_BELOW: &str = "biome.deep_below";
         pub const BARE_ABOVE: &str = "biome.bare_above";
+        pub const BARE_STEEPER: &str = "biome.bare_steeper";
         pub const ICE: &str = "biome.ice";
         pub const TINTS: &str = "biome.tints";
     }
@@ -5802,7 +5804,8 @@ crate::data! {
     /// fields of `ranges` (`temperature`, `humidity`, `continent`, or ones the terrain declares)
     /// are in range and the surface in `height` (inclusive): `top`, `depth` blocks of `filler`
     /// (empty: stone), the lowest `under_layers` of them `under`; `deep_top` on columns lower than
-    /// `deep_below`, plain stone above `bare_above`, the water surface frozen into `ice`.
+    /// `deep_below`, plain stone above `bare_above` and where the ground rises more than
+    /// `bare_steeper` blocks per block (infinity: nowhere), the water surface frozen into `ice`.
     pub struct BiomeRule {
         pub name: alloc::string::String,
         pub fields: u32,
@@ -5817,6 +5820,7 @@ crate::data! {
         pub deep_top: alloc::string::String,
         pub deep_below: i32,
         pub bare_above: i32,
+        pub bare_steeper: f64,
         pub ice: alloc::string::String,
     }
 }
@@ -5859,6 +5863,7 @@ pub mod rule_field {
     pub const DEEP_TOP: u32 = 32;
     pub const BARE_ABOVE: u32 = 64;
     pub const FROZEN: u32 = 128;
+    pub const BARE_STEEPER: u32 = 256;
 }
 
 /// One command argument; kinds in `command_value`.
