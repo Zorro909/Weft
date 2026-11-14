@@ -81,6 +81,9 @@ const RELIEF_SIZE: f64 = 1600.0;
 /// Gullies run down the slopes of ranges and massifs this many blocks apart and this deep.
 const GULLY_SIZE: f64 = 64.0;
 const GULLY_DEPTH: f64 = 12.0;
+/// How much of `RANGE` and of `MOUNTAINS` a column needs for gullies to start, and for all of them.
+const ERODED_RANGE: (f64, f64) = (0.1, FOOTHILLS);
+const ERODED_MASSIF: (f64, f64) = (0.3, 0.6);
 
 /// The share of the squares of a range's meadow that a tree stands in.
 const MEADOW_TREES: f32 = 0.04;
@@ -247,7 +250,10 @@ pub fn ranges() -> Landform {
 }
 
 /// Gullies and the spurs between them on the slopes of ranges and massifs. They only cut, so
-/// nothing gets higher than its landform made it.
+/// nothing gets higher than its landform made it. An eroded column costs three plain ones, so
+/// the mask starts where a range or a massif is high enough to have slopes that steep.
 pub fn erosion() -> Erosion {
-    Erosion::new(GULLY_SIZE, GULLY_DEPTH).mask(foothills().max(Expr::field(MOUNTAINS)))
+    let in_range = range().ramp(ERODED_RANGE.0, ERODED_RANGE.1);
+    let on_massif = Expr::field(MOUNTAINS).ramp(ERODED_MASSIF.0, ERODED_MASSIF.1);
+    Erosion::new(GULLY_SIZE, GULLY_DEPTH).mask(in_range.max(on_massif))
 }
