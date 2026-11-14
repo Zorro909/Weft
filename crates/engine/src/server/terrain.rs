@@ -15,7 +15,10 @@ use weft_noise::fixed::{ONE, div_floor, fbm, hash, perlin2, perlin3, q4, q12, ra
 use crate::entries::Entry;
 use crate::gpu_layout::terrain::limit;
 
+mod erosion;
 mod steep;
+
+pub use erosion::Erosion;
 
 fn step(kind: u32, a: i32) -> ExprStep {
     ExprStep { kind, a, ..Default::default() }
@@ -250,6 +253,8 @@ pub struct Terrain {
     pub fields: Vec<Field>,
     pub features: Vec<Feature>,
     pub rules: Vec<Rule>,
+    /// Cut into the ground the features add up to.
+    pub erosion: Option<Erosion>,
     pub caves: Option<Caves>,
     /// Biomes of cubes deep underground.
     pub cave_biomes: Vec<CaveBiome>,
@@ -448,12 +453,20 @@ pub fn build(dimension: &str, e: &Entry, names: &Names, errors: &mut Vec<String>
             threshold: q12(c.threshold),
         })
         .collect();
-    // What no feature or rule looks at, directly or through another field, is not computed.
+    let erosion = e
+        .get::<abi::TerrainErosion>(t::EROSION)
+        .and_then(|described| {
+            Erosion::resolve(&described, &field_at)
+                .map_err(|e| errors.push(format!("terrain of {dimension}: erosion: mask {e}")))
+                .ok()
+        });
+    // What no feature, rule or erosion looks at, directly or through another field, is not computed.
     let mut needed: Vec<bool> = (0..fields.len())
         .map(|i| {
-            features
-                .iter()
-                .any(|f| f.height.uses(i) || f.mask.as_ref().is_some_and(|m| m.uses(i)))
+            erosion.as_ref().is_some_and(|erosion| erosion.uses(i))
+                || features
+                    .iter()
+                    .any(|f| f.height.uses(i) || f.mask.as_ref().is_some_and(|m| m.uses(i)))
                 || rules
                     .iter()
                     .any(|r| r.height_from == Some(i) || r.ranges.iter().any(|x| x.0 == i))
@@ -469,7 +482,9 @@ pub fn build(dimension: &str, e: &Entry, names: &Names, errors: &mut Vec<String>
             f.expr = Expr::default();
         }
     }
-    Terrain::new(stone, q4(e.or(t::BASE_HEIGHT, 64.0)), sea, fields, features, rules, caves, cave_biomes)
+    let mut terrain = Terrain::new(stone, q4(e.or(t::BASE_HEIGHT, 64.0)), sea, fields, features, rules, caves, cave_biomes);
+    terrain.erosion = erosion;
+    terrain
 }
 
 impl Terrain {
@@ -490,6 +505,7 @@ impl Terrain {
             fields,
             features,
             rules,
+            erosion: None,
             caves,
             cave_biomes,
             cache: ColumnCache::new(32768),
@@ -504,26 +520,8 @@ impl Terrain {
     /// Height, biome and rule of column (`x`, `z`).
     fn compute(&self, seed: u64, x: i32, z: i32) -> (TerrainColumn, u32) {
         let (fx, fz) = (x * 16, z * 16);
-        let mut v = [0i32; limit::FIELDS as usize];
-        for (i, f) in self.fields.iter().enumerate() {
-            v[i] = f.expr.eval(&v, seed, fx, fz);
-        }
-        let mut h = self.base;
-        for feat in &self.features {
-            let w = feat
-                .mask
-                .as_ref()
-                .map_or(ONE, |m| m.eval(&v, seed, fx, fz).min(ONE));
-            if w > 0 {
-                h = h.wrapping_add(
-                    (w * feat
-                        .height
-                        .eval(&v, seed, fx, fz)
-                        .clamp(-HEIGHT_LIMIT, HEIGHT_LIMIT))
-                        >> 12,
-                );
-            }
-        }
+        let (v, h) = self.ground(seed, fx, fz);
+        let h = h.wrapping_sub(self.cut(seed, fx, fz, &v, h));
         let height = h >> 4;
         let rule = self
             .rules
