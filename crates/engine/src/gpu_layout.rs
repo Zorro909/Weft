@@ -151,8 +151,8 @@ pub mod terrain {
         /// highest surface height, the word where its conditions start and how many there
         /// are, top block, filler block, depth, under block and layers, deep top block
         /// and the height below which it applies, ice block, a flag for bare stone and the
-        /// height above which that is, and the squared steepness (Q4) above which it is bare
-        /// too (-1: never).
+        /// height above which that is, the squared steepness (Q4) above which it is bare
+        /// too (-1: never), and the field its heights are counted from (-1: from 0).
         words {
             /// An expression step: kind, the noise seed (made from its salt), then `a`, `b`, `c`.
             STEP = 5,
@@ -160,7 +160,7 @@ pub mod terrain {
             FIELD = 2,
             /// A feature: start and count of its height's steps, and of its mask's (count 0: none).
             FEATURE = 4,
-            RULE = 16,
+            RULE = 17,
             /// A condition of a rule: the field, from, to.
             COND = 3,
             CAVE = 5,

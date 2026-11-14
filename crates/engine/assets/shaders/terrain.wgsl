@@ -251,7 +251,11 @@ fn column(bx: i32, bz: i32) -> Column {
     }
     for (var i = 0u; i < nr; i++) {
         let r = ro + i * WORDS_RULE;
-        var ok = height >= desc[r + 1u] && height <= desc[r + 2u];
+        var above = height;
+        if (desc[r + 16u] >= 0) {
+            above -= fv[u32(desc[r + 16u])] >> 4u;
+        }
+        var ok = above >= desc[r + 1u] && above <= desc[r + 2u];
         for (var k = 0u; ok && k < u32(desc[r + 4u]); k++) {
             let c = u32(desc[r + 3u]) + k * WORDS_COND;
             let v = fv[u32(desc[c])];

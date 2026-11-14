@@ -2472,6 +2472,7 @@ fn number_biomes(
                 biome: e.name.clone(),
                 ranges,
                 height: e.or(b::HEIGHT, [i32::MIN, i32::MAX]),
+                height_from: String::new(),
                 top: text(b::TOP),
                 filler: text(b::FILLER),
                 depth: e.or(b::DEPTH, 3),

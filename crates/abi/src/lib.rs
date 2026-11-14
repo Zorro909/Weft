@@ -5802,7 +5802,8 @@ crate::data! {
     /// fits wins, the last where none does. Other mods find it by its full `name`; what `fields`
     /// (`rule_field`) doesn't give comes from the biome's own (`comp::biome`). It holds where the
     /// fields of `ranges` (`temperature`, `humidity`, `continent`, or ones the terrain declares)
-    /// are in range and the surface in `height` (inclusive): `top`, `depth` blocks of `filler`
+    /// are in range and the surface in `height` (inclusive, counted from the value of the field
+    /// `height_from`, a length, when that is named): `top`, `depth` blocks of `filler`
     /// (empty: stone), the lowest `under_layers` of them `under`; `deep_top` on columns lower than
     /// `deep_below`, plain stone above `bare_above` and where the ground rises more than
     /// `bare_steeper` blocks per block (infinity: nowhere), the water surface frozen into `ice`.
@@ -5812,6 +5813,7 @@ crate::data! {
         pub biome: alloc::string::String,
         pub ranges: alloc::vec::Vec<RuleRange>,
         pub height: [i32; 2],
+        pub height_from: alloc::string::String,
         pub top: alloc::string::String,
         pub filler: alloc::string::String,
         pub depth: i32,
@@ -5857,6 +5859,7 @@ pub mod rule_field {
     pub const BIOME: u32 = 1;
     /// `ranges`: in an edit each one replaces the rule's range of that field, or adds one.
     pub const RANGES: u32 = 2;
+    /// `height` and `height_from`.
     pub const HEIGHT: u32 = 4;
     pub const SURFACE: u32 = 8;
     pub const UNDER: u32 = 16;
