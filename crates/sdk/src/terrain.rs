@@ -424,6 +424,14 @@ impl BiomeRule {
     pub fn height(mut self, range: impl RangeBounds<i32>) -> Self {
         let (min, max) = range_i32(range);
         (self.0.height, self.0.fields) = ([min, max], self.0.fields | rf::HEIGHT);
+        self.0.height_from.clear();
+        self
+    }
+    /// Surface heights counted from the value of `field`, a length: `height_from("snow_line",
+    /// 0..)` is the ground from the snow line up, wherever the field puts that line.
+    pub fn height_from(mut self, field: &str, range: impl RangeBounds<i32>) -> Self {
+        self = self.height(range);
+        self.0.height_from = field.to_string();
         self
     }
     /// Top block, then `depth` blocks of filler, then the terrain's stone.

@@ -41,6 +41,7 @@ pub(crate) fn merge(rule: &mut BiomeRule, edit: &BiomeRule) {
     }
     if has(rf::HEIGHT) {
         rule.height = edit.height;
+        rule.height_from.clone_from(&edit.height_from);
     }
     if has(rf::SURFACE) {
         (rule.top, rule.filler, rule.depth) = (edit.top.clone(), edit.filler.clone(), edit.depth);
@@ -194,6 +195,8 @@ pub struct Rule {
     /// Index into `Terrain::fields`, then the range the field must be in (Q12).
     pub ranges: Vec<(usize, i32, i32)>,
     pub height: (i32, i32),
+    /// Index into `Terrain::fields` of the length (Q4) `height` is counted from.
+    pub height_from: Option<usize>,
     pub top: Option<u32>,
     pub filler: Option<u32>,
     pub depth: i32,
@@ -203,6 +206,19 @@ pub struct Rule {
     /// Plain stone where the ground is steeper than this (`steep::steepness`'s unit).
     pub bare_steeper: Option<i32>,
     pub ice: Option<u32>,
+}
+
+impl Rule {
+    /// Whether a column `height` high, where the fields are `fields`, is this rule's.
+    fn fits(&self, height: i32, fields: &[i32]) -> bool {
+        let height = height.wrapping_sub(self.height_from.map_or(0, |field| fields[field] >> 4));
+        height >= self.height.0
+            && height <= self.height.1
+            && self
+                .ranges
+                .iter()
+                .all(|&(field, from, to)| fields[field] >= from && fields[field] < to)
+    }
 }
 
 pub struct Caves {
@@ -395,10 +411,17 @@ pub fn build(dimension: &str, e: &Entry, names: &Names, errors: &mut Vec<String>
             })
             .collect();
         let what = format!("biome rule {}", r.name);
+        let height_from = (!r.height_from.is_empty())
+            .then(|| field_at(&r.height_from))
+            .flatten();
+        if height_from.is_none() && !r.height_from.is_empty() {
+            errors.push(format!("terrain of {dimension}: {what} counts its height from field {}, which it doesn't have", r.height_from));
+        }
         rules.push(Rule {
             biome,
             ranges,
             height: (r.height[0], r.height[1]),
+            height_from,
             top: block(&r.top, &what, errors),
             filler: block(&r.filler, &what, errors),
             depth: r.depth,
@@ -431,7 +454,9 @@ pub fn build(dimension: &str, e: &Entry, names: &Names, errors: &mut Vec<String>
             features
                 .iter()
                 .any(|f| f.height.uses(i) || f.mask.as_ref().is_some_and(|m| m.uses(i)))
-                || rules.iter().any(|r| r.ranges.iter().any(|x| x.0 == i))
+                || rules
+                    .iter()
+                    .any(|r| r.height_from == Some(i) || r.ranges.iter().any(|x| x.0 == i))
         })
         .collect();
     for i in (0..fields.len()).rev() {
@@ -503,7 +528,7 @@ impl Terrain {
         let rule = self
             .rules
             .iter()
-            .position(|b| height >= b.height.0 && height <= b.height.1 && b.ranges.iter().all(|&(f, lo, hi)| v[f] >= lo && v[f] < hi))
+            .position(|rule| rule.fits(height, &v))
             .unwrap_or(self.rules.len().saturating_sub(1));
         (TerrainColumn { height, biome: self.rules.get(rule).map_or(0, |r| r.biome) }, rule as u32)
     }
@@ -825,6 +850,7 @@ mod tests {
             biome,
             ranges: Vec::new(),
             height: (i32::MIN, i32::MAX),
+            height_from: None,
             top: None,
             filler: None,
             depth: 3,
@@ -1010,6 +1036,17 @@ mod tests {
                 .biome,
             1
         );
+    }
+
+    #[test]
+    fn heights_count_from_a_field() {
+        // The line is at y 100 where x is 0 and one block higher every block east.
+        let line = Field { name: "line".into(), expr: expr(vec![step(ek::X, 0), step(ek::CONST, 100 * 16), step(ek::ADD, 0)]) };
+        let above = Rule { height: (0, i32::MAX), height_from: Some(0), ..rule(1) };
+        let mut t = terrain(Vec::new(), vec![above, rule(2)], None, 120.0);
+        t.fields = vec![line];
+        assert_eq!(t.column(1, 20, 0).biome, 1, "at the line");
+        assert_eq!(t.column(1, 21, 0).biome, 2, "a block under the line");
     }
 
     fn biome_rule(name: &str, biome: &str) -> BiomeRule {

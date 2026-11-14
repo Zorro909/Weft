@@ -70,6 +70,7 @@ mod tests {
             biome: 0,
             ranges: Vec::new(),
             height: (i32::MIN, i32::MAX),
+            height_from: None,
             top: Some(GRASS),
             filler: None,
             depth: 0,
