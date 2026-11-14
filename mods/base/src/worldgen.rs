@@ -23,6 +23,10 @@ const SNOW_FLOOR: i32 = 165;
 const BAND: f64 = 0.1;
 /// No climate is warm enough for a snow line above this
 const SNOW_TOP: i32 = 520;
+/// Blocks across the patches the snow line frays into
+const SNOW_PATCH: f64 = 32.0;
+/// How far the patches move the line, in steps of temperature (`LAPSE` blocks each)
+const SNOW_FRAY: f64 = 0.4;
 
 fn snow_bands() -> Vec<(f64, f64, i32)> {
     let coldest = f64::from(SNOW_FLOOR - SNOW_LINE) / LAPSE;
@@ -204,11 +208,15 @@ pub fn register(r: &mut Registry) {
         .landform(relief::mountains())
         .landform(relief::ranges())
         .field(relief::HIGHLAND, relief::highland_field())
-        // Slight jittering so snow doesn't fall on visible contours
+        .field(relief::ROCK, relief::rock_field())
+        // Jittered so snow doesn't end on a contour: the line drifts over a mountain's width and
+        // frays into patches a few blocks to a few dozen across.
         .field(
             "base:alpine",
             Expr::temperature() + Expr::noise(400.0) * Expr::value(0.2) + Expr::noise(70.0) * Expr::value(0.1)
-                - Expr::humidity() * Expr::value(0.1),
+                - Expr::humidity() * Expr::value(0.1)
+                + Expr::noise(SNOW_PATCH) * Expr::value(SNOW_FRAY)
+                + Expr::noise(SNOW_PATCH / 4.0) * Expr::value(SNOW_FRAY / 2.0),
         )
         // Biomes bring their climate and surface; rules only add where else they must hold.
         .rule(BiomeRule::new("ocean").height(..=SEA - 2))
@@ -229,12 +237,10 @@ pub fn register(r: &mut Registry) {
                 .height(line..),
         );
     }
+    for rule in relief::alpine_rules() {
+        terrain = terrain.rule(rule);
+    }
     terrain
-        .rule(
-            BiomeRule::new("range_alpine")
-                .field(relief::RANGE, relief::RANGE_BIOME..)
-                .height(relief::TREE_LINE..),
-        )
         .rule(
             BiomeRule::new("range_forest")
                 .field(relief::RANGE, relief::RANGE_BIOME..)

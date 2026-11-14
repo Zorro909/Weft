@@ -104,6 +104,16 @@ mod salt {
     pub const HILLS: u64 = weft_sdk::noise::fixed::salt::HILLS;
 }
 
+/// Noise the alpine biome's rock line follows, so it doesn't run along a contour.
+pub const ROCK: &str = "base:rock";
+/// Blocks across the patches the rock line frays into
+const ROCK_PATCH: f64 = 44.0;
+/// Blocks the patches move the rock line up and down, in `ROCK_BANDS` steps
+const ROCK_FRAY: i32 = 45;
+const ROCK_BANDS: i32 = 9;
+/// The `ROCK` noise mostly stays within this
+const ROCK_NOISE: f64 = 0.45;
+
 pub static RANGE_FOREST: Biome = Biome::named("range_forest");
 pub static RANGE_ALPINE: Biome = Biome::named("range_alpine");
 
@@ -132,6 +142,29 @@ pub fn biomes(r: &mut Registry) {
         .tag("mountain_range")
         .tag("animals")
         .set(&GRASS_COVER, 0.2);
+}
+
+pub fn rock_field() -> Expr {
+    Expr::noise(ROCK_PATCH) + Expr::noise(ROCK_PATCH / 4.0) * Expr::value(0.5)
+}
+
+/// The alpine biome above the tree line, one rule per band of `ROCK`: each starts its bare rock
+/// at another height.
+pub fn alpine_rules() -> Vec<BiomeRule> {
+    let edge = |i: i32| ROCK_NOISE * f64::from(2 * i - ROCK_BANDS) / f64::from(ROCK_BANDS);
+    (0..ROCK_BANDS)
+        .map(|i| {
+            let from = if i == 0 { f64::NEG_INFINITY } else { edge(i) };
+            let to = if i == ROCK_BANDS - 1 { f64::INFINITY } else { edge(i + 1) };
+            let shift = ROCK_FRAY * (2 * i + 1 - ROCK_BANDS) / ROCK_BANDS;
+            BiomeRule::new("range_alpine")
+                .named(&format!("rock_line_{i}"))
+                .field(RANGE, RANGE_BIOME..)
+                .field(ROCK, from..to)
+                .height(TREE_LINE..)
+                .bare_above(ROCK_FROM + shift)
+        })
+        .collect()
 }
 
 fn range() -> Expr {
