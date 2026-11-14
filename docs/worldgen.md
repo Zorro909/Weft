@@ -264,7 +264,7 @@ A field is a named value over the whole terrain. `temperature`, `humidity` and `
 .landform(Landform::new(massifs).mask(Expr::field("base:mountains")).named("mountains"))
 .rule(BiomeRule::new("mountains").field("base:mountains", 0.45..))
 ```
-The overworld's other fields are `base:range` (0 outside a mountain range to 1 on its spine; the biomes `range_forest` and `range_alpine` start at 0.25) and `base:relief` (0 in plains to 1 in uplands and at the foot of a range).
+The overworld's other fields are `base:range` (0 outside a mountain range to 1 on its spine; the biomes `range_forest` and `range_alpine` start at 0.25) `base:relief` (0 in plains to 1 in uplands and at the foot of a range), and the noises `base:alpine` and `base:rock` that the snow line and a range's rock line follow, so neither runs along a contour.
 
 The name is used as written, so give yours your mod's prefix. A field can only use fields declared before it. Declaring one that exists, `temperature` included, replaces it for everything that uses it, which is how a mod gives the whole overworld another climate.
 
