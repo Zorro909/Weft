@@ -78,6 +78,10 @@ const UPLAND_HILLS: f64 = 34.0;
 const HILL_SIZE: f64 = 170.0;
 const RELIEF_SIZE: f64 = 1600.0;
 
+/// Gullies run down the slopes of ranges and massifs this many blocks apart and this deep.
+const GULLY_SIZE: f64 = 64.0;
+const GULLY_DEPTH: f64 = 12.0;
+
 /// The share of the squares of a range's meadow that a tree stands in.
 const MEADOW_TREES: f32 = 0.04;
 
@@ -240,4 +244,10 @@ pub fn ranges() -> Landform {
     Landform::new(height)
         .mask(range().ramp(0.0, 0.001))
         .named("range")
+}
+
+/// Gullies and the spurs between them on the slopes of ranges and massifs. They only cut, so
+/// nothing gets higher than its landform made it.
+pub fn erosion() -> Erosion {
+    Erosion::new(GULLY_SIZE, GULLY_DEPTH).mask(foothills().max(Expr::field(MOUNTAINS)))
 }
