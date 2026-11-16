@@ -55,6 +55,7 @@ pub fn all() -> Vec<TestDef> {
         world::virtual_menus,
         world::worldgen,
         relief::mountain_ranges,
+        relief::massifs_stay_out_of_ranges,
         relief::cliffs,
         world::generation_reads,
         world::plants_on_cube_tops,

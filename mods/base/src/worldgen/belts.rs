@@ -74,10 +74,12 @@ pub fn rules() -> Vec<BiomeRule> {
             .named(name)
             .field(RANGE, RANGE_BIOME..)
     };
+    // A range has no massifs, though the field they stand on goes on under it.
     let massif = |name: &str| {
         BiomeRule::new("mountains")
             .named(name)
             .field(MOUNTAINS, MOUNTAINS_BIOME..)
+            .field(RANGE, ..RANGE_BIOME)
     };
     let massif_rock = MASSIF_ROCK - RANGE_ROCK;
     let gravel = |rule: BiomeRule| {

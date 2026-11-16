@@ -15,6 +15,8 @@ const SEA: i32 = 63;
 const SKY: i32 = 640;
 /// Ground that rises this much over 4 blocks is steeper than base's cliffs start (1.5 per block).
 const CLIFF_RISE: i32 = 8;
+/// From a column to the four around it that tell whether it lies inside a range.
+const NEXT: [(i32, i32); 4] = [(-64, 0), (64, 0), (0, -64), (0, 64)];
 
 /// Mountain ranges are rare, rise far above the land around them, and nothing reaches the sky.
 pub async fn mountain_ranges(t: T) -> R {
@@ -43,6 +45,19 @@ pub async fn mountain_ranges(t: T) -> R {
     t.check(range_top >= 180, format!("ranges stay low: {range_top}"));
     t.probe("percent of the land in a range", share(range), (0.5..8.0).contains(&share(range)));
     t.probe("percent of the land in mountains", share(mountains), (0.5..8.0).contains(&share(mountains)));
+    Ok(())
+}
+
+/// A massif's bare rock stays out of mountain ranges: no column of it has a range on all sides.
+pub async fn massifs_stay_out_of_ranges(t: T) -> R {
+    let biome = |x: i32, z: i32| name_of(ek::BIOME, OVERWORLD.column(SEED, x, z).biome);
+    let in_range = |x: i32, z: i32| matches!(biome(x, z), "base:range_forest" | "base:range_alpine");
+    let enclosed = (-REACH..REACH)
+        .flat_map(|z| (-REACH..REACH).map(move |x| (x * STEP, z * STEP)))
+        .filter(|&(x, z)| biome(x, z) == "base:mountains")
+        .filter(|&(x, z)| NEXT.iter().all(|&(dx, dz)| in_range(x + dx, z + dz)))
+        .count();
+    t.check_eq(enclosed, 0, "massif columns with a range on all four sides");
     Ok(())
 }
 
