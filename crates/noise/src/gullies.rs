@@ -74,17 +74,17 @@ fn stripes(seed: u32, x: i32, z: i32, size: i32, along_x: i32, along_z: i32) -> 
     let (mut cos, mut sin, mut weight) = (0, 0, 0);
     for dz in -1..=1 {
         for dx in -1..=1 {
-            let h = hash(seed, cell_x + dx, 0, cell_z + dz);
+            let rolls = hash(seed, cell_x + dx, 0, cell_z + dz);
             let pivot = |cell: i32, roll: u32| cell * size + (((MARGIN + (roll & 4095) as i32 / 2) * size) >> 12);
             // From the pivot to the point, in cells (Q12).
-            let off_x = (x - pivot(cell_x + dx, h)) * ONE / size;
-            let off_z = (z - pivot(cell_z + dz, h >> 12)) * ONE / size;
+            let off_x = (x - pivot(cell_x + dx, rolls)) * ONE / size;
+            let off_z = (z - pivot(cell_z + dz, rolls >> 12)) * ONE / size;
             let near = (((REACH * REACH) >> 12) - ((off_x * off_x + off_z * off_z) >> 12)).max(0);
-            let w = (near * near) >> 12;
+            let pull = (near * near) >> 12;
             let across = (off_z * along_x - off_x * along_z) >> 12;
-            cos += w * sine(across + ONE / 4);
-            sin += w * sine(across);
-            weight += w;
+            cos += pull * sine(across + ONE / 4);
+            sin += pull * sine(across);
+            weight += pull;
         }
     }
     if weight == 0 {
