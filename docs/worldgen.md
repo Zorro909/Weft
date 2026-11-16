@@ -258,7 +258,7 @@ preset::hills(16.0, 110.0).mask(Expr::temperature().ramp(-0.35, -0.6).not())
 ```
 
 ### Erosion
-`.erosion(Erosion::new(size, depth))` cuts gullies into the slopes of everything the landforms add up to: they run down the slope about `size` blocks apart and `depth` deep, finer ones branch into them, and the spurs between them keep their height, so erosion never raises the ground. Gentle ground (rising less than 5 blocks in 8) stays as it is. `.mask(expr)` limits it like a landform's mask. Base erodes its mountain ranges and massifs:
+`.erosion(Erosion::new(size, depth))` cuts gullies into the slopes of everything the landforms add up to: they run down the slope about `size` blocks apart and `depth` deep, finer ones branch into them, and the spurs between them keep their height, so erosion never raises the ground. Gentle ground (rising less than 5 blocks in 8) stays as it is. `size` is held to 4 to 256 blocks and `depth` to 0 to 1024. `.mask(expr)` limits it like a landform's mask. Base erodes its mountain ranges and massifs:
 
 ```rust
 .erosion(Erosion::new(64.0, 12.0).mask(Expr::field("base:range").ramp(0.1, 0.3).max(Expr::field("base:mountains").ramp(0.3, 0.6))))

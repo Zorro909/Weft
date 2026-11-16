@@ -518,8 +518,8 @@ pub struct Erosion {
 }
 
 impl Erosion {
-    /// Gullies about `size` blocks apart and `depth` blocks deep; with the finer ones in them a
-    /// cut reaches down to 1.75 times that.
+    /// Gullies about `size` blocks apart (4 to 256) and `depth` blocks deep (up to 1024); with
+    /// the finer ones in them a cut reaches down to 1.75 times that.
     pub fn new(size: f64, depth: f64) -> Erosion {
         Erosion { size, depth, mask: None }
     }

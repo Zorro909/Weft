@@ -48,7 +48,7 @@ fn fray(size: f64) -> Expr {
     Expr::noise(size) + Expr::noise(size / 4.0) * Expr::value(0.5)
 }
 
-/// The `SNOW_LINE` field: higher in warm and wet climates, drifting over a mountain's width.
+/// The `SNOW_LINE` field: higher in warm and dry climates, drifting over a mountain's width.
 pub fn snow_line() -> Expr {
     let climate = Expr::temperature() + Expr::noise(400.0) * Expr::value(0.2) + Expr::noise(70.0) * Expr::value(0.1)
         - Expr::humidity() * Expr::value(0.1);
